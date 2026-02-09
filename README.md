@@ -1,6 +1,6 @@
 # Mitigating Collaborative Semantic ID Staleness in Generative Retrieval
 
-This is the official implementation of the paper **“Mitigating Collaborative Semantic ID Staleness in Generative Retrieval”**.
+This is the official implementation of the paper **"Mitigating Collaborative Semantic ID Staleness in Generative Retrieval"**.
 
 The repository contains the complete source code and experimental assets required to reproduce all results reported in the paper, including:
 - Data preprocessing notebooks for 3 benchmarks (Amazon Beauty, Yambda, VK-LSVD)

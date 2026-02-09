@@ -4,16 +4,16 @@ import torch.nn as nn
 
 class RQVAE(nn.Module):
     def __init__(
-            self,
-            input_dim,
-            num_codebooks,
-            codebook_size,
-            embedding_dim,
-            beta=0.25,
-            quant_loss_weight=1.0,
+        self,
+        input_dim,
+        num_codebooks,
+        codebook_size,
+        embedding_dim,
+        beta=0.25,
+        quant_loss_weight=1.0,
     ):
         super().__init__()
-        self.register_buffer('beta', torch.tensor(beta))
+        self.register_buffer("beta", torch.tensor(beta))
 
         self.input_dim = input_dim
         self.num_codebooks = num_codebooks
@@ -32,11 +32,7 @@ class RQVAE(nn.Module):
     @staticmethod
     def make_encoding_tower(d1, d2, bias=False):
         return torch.nn.Sequential(
-            nn.Linear(d1, d1),
-            nn.ReLU(),
-            nn.Linear(d1, d2),
-            nn.ReLU(),
-            nn.Linear(d2, d2, bias=bias)
+            nn.Linear(d1, d1), nn.ReLU(), nn.Linear(d1, d2), nn.ReLU(), nn.Linear(d2, d2, bias=bias)
         )
 
     @staticmethod
@@ -45,7 +41,7 @@ class RQVAE(nn.Module):
         return dist.argmin(dim=-1)
 
     def forward(self, inputs):
-        latent_vector = self.encoder(inputs['embedding'])
+        latent_vector = self.encoder(inputs["embedding"])
 
         latent_restored = 0
         rqvae_loss = 0
@@ -65,20 +61,17 @@ class RQVAE(nn.Module):
             remainder = remainder - codebook_vectors
 
         embeddings_restored = self.decoder(latent_restored)
-        recon_loss = torch.nn.functional.mse_loss(embeddings_restored, inputs['embedding'])
+        recon_loss = torch.nn.functional.mse_loss(embeddings_restored, inputs["embedding"])
 
         loss = (recon_loss + self.quant_loss_weight * rqvae_loss).mean()
 
-        clusters_counts = []
-        for cluster in clusters:
-            clusters_counts.append(torch.bincount(cluster, minlength=self.codebook_size))
+        clusters_counts = [torch.bincount(cluster, minlength=self.codebook_size) for cluster in clusters]
 
         return loss, {
-            'loss': loss.item(),
-            'recon_loss': recon_loss.mean().item(),
-            'rqvae_loss': rqvae_loss.mean().item(),
-
-            'clusters_counts': clusters_counts,
-            'clusters': torch.stack(clusters).T,
-            'embedding_hat': embeddings_restored,
+            "loss": loss.item(),
+            "recon_loss": recon_loss.mean().item(),
+            "rqvae_loss": rqvae_loss.mean().item(),
+            "clusters_counts": clusters_counts,
+            "clusters": torch.stack(clusters).T,
+            "embedding_hat": embeddings_restored,
         }
