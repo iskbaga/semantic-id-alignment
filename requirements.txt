@@ -1,0 +1,13 @@
+loguru
+numpy
+polars
+torch
+hydra-core
+omegaconf
+transformers
+murmurhash
+torchdata
+scipy
+datasets
+tensorboard
+jupyter

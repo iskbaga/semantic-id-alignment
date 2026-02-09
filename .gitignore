@@ -1,0 +1,13 @@
+__pycache__
+data/*
+temp_files/*
+scripts/*/outputs/
+scripts/outputs/
+notebooks/.ipynb_checkpoints
+*.egg-info
+.DS_Store
+.venv
+.ruff_cache
+.mypy_cache
+.vscode
+wandb/*

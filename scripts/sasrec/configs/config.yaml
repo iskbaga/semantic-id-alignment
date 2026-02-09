@@ -1,0 +1,44 @@
+# @package _global_
+
+defaults:
+  - _self_
+
+paths:
+  data_dir: "../data/${dataset.name}"
+  results_dir: "../temp_files/results_${dataset.name}"
+  tensorboard_dir: "../temp_files/logs_${dataset.name}"
+  checkpoints_dir: "../temp_files/checkpoints_${dataset.name}"
+
+dataset:
+  name: "vk-lsvd"
+  train_parts: [0, 8]
+  val_parts: [8, 9]
+  test_parts: [9, 10]
+
+finetune:
+  train_parts: [0, 8]
+  gap_parts: [8, 9]
+  val_parts: [9, 10]
+  test_parts: [9, 10]
+
+model:
+  max_seq_len: 20
+  embedding_dim: 64
+  num_heads: 2
+  num_layers: 2
+  feedforward_dim: 256
+  dropout: 0.3
+  activation: "relu"
+  top_k: 20
+
+training:
+  seed_value: 42
+  device: "cuda"
+  num_epochs: 150
+  train_batch_size: 256
+  valid_batch_size: 1024
+  metric: "validation/ndcg@20"
+  patience: 60
+  minimize_metric: false
+  lr: 1e-4
+  save_embeddings: true

@@ -1,0 +1,62 @@
+# @package _global_
+
+defaults:
+  - _self_
+
+paths:
+  data_dir: "../data/${dataset.name}"
+  results_dir: "../temp_files/results_${dataset.name}"
+  tensorboard_dir: "../temp_files/logs_${dataset.name}"
+  checkpoints_dir: "../temp_files/checkpoints_${dataset.name}"
+
+dataset:
+  name: "vk-lsvd"
+
+  rqvae:
+    model_name: "letter"
+    train_parts: [0, 8]
+    val_parts: [8, 9]
+    test_parts: [9, 10]
+
+  tiger:
+    train_parts: [0, 8]
+    val_parts: [8, 9]
+    test_parts: [9, 10]
+
+finetune:
+  matching_method: "hungarian" #none, hungarian or greedy
+  rqvae:
+    train_parts: [0, 8]
+    val_parts: [8, 9]
+    test_parts: [9, 10]
+  gap_parts: [8, 9]
+  test_parts: [9, 10]
+
+model:
+  max_seq_len: 20
+  embedding_dim: 128
+  codebook_size: 512
+  num_user_hash: 8000
+  num_heads: 6
+  num_layers: 4
+  feedforward_dim: 1024
+  activation: "relu"
+  dropout: 0.1
+  num_beams: 20
+  top_k: 20
+  num_codebooks: 4
+
+training:
+  seed_value: 42
+  device: "cuda:0"
+  train_batch_size: 256
+  valid_batch_size: 256
+  num_epochs: 30
+  lr: 1e-4
+  patience: 40
+  minimize_metric: false
+  metric: "eval/ndcg@20"
+
+inference:
+  use_finetune_model: True
+  test_parts: [9, 10]
