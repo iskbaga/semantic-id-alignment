@@ -39,43 +39,73 @@ def create_collate_fn(num_codebooks, codebook_size, device):
 
 
 def generate_constants(cfg: DictConfig):
-    rqvae_split_name = (
-        f"{cfg.dataset.rqvae.train_parts[0]}-{cfg.dataset.rqvae.train_parts[1]}TR_"
-        f"{cfg.dataset.rqvae.val_parts[0]}-{cfg.dataset.rqvae.val_parts[1]}V_"
-        f"{cfg.dataset.rqvae.test_parts[0]}-{cfg.dataset.rqvae.test_parts[1]}T"
+    pretrained_allowed_parts = cfg.train.allowed_items_parts or cfg.train.sid_retriever_train_parts
+    pretrained_sid_retriever_split_name = (
+        f"{cfg.train.sid_retriever_train_parts[0]}-{cfg.train.sid_retriever_train_parts[1]}TR_"
+        f"{cfg.train.sid_retriever_val_parts[0]}-{cfg.train.sid_retriever_val_parts[1]}V_"
+        f"{cfg.train.sid_retriever_test_parts[0]}-{cfg.train.sid_retriever_test_parts[1]}T_"
+        f"items-{pretrained_allowed_parts[0]}-{pretrained_allowed_parts[1]}"
     )
-    tiger_split_name = (
-        f"{cfg.dataset.tiger.train_parts[0]}-{cfg.dataset.tiger.train_parts[1]}TR_"
-        f"{cfg.dataset.tiger.val_parts[0]}-{cfg.dataset.tiger.val_parts[1]}V_"
-        f"{cfg.dataset.tiger.test_parts[0]}-{cfg.dataset.tiger.test_parts[1]}T"
+    pretrained_rqvae_split_name = (
+        f"{cfg.train.rqvae_train_parts[0]}-{cfg.train.rqvae_train_parts[1]}TR_"
+        f"{cfg.train.rqvae_val_parts[0]}-{cfg.train.rqvae_val_parts[1]}V_"
+        f"{cfg.train.rqvae_test_parts[0]}-{cfg.train.rqvae_test_parts[1]}T"
     )
 
-    experiment_name = f"tiger_{cfg.dataset.rqvae.model_name}-{rqvae_split_name}_{cfg.dataset.name}_{tiger_split_name}"
-    rqvae_results_path = Path(cfg.paths.results_dir) / rqvae_split_name / f"rqvae-{cfg.dataset.rqvae.model_name}"
-
-    all_items_mapping_path_name = "all_clusters_colisionless.json"
-    train_part_mapping_path_name = (
-        f"only_{cfg.dataset.tiger.train_parts[0]}-{cfg.dataset.tiger.train_parts[1]}TR_clusters_colisionless.json"
+    pretrained_name = (
+        f"sid-retriever_{cfg.dataset.name}_{pretrained_sid_retriever_split_name}_{pretrained_rqvae_split_name}"
     )
 
     if cfg.inference.use_finetune_model:
-        finetune_rqvae_split_name = (
-            f"{cfg.finetune.rqvae.train_parts[0]}-{cfg.finetune.rqvae.train_parts[1]}TR_"
-            f"{cfg.finetune.rqvae.val_parts[0]}-{cfg.finetune.rqvae.val_parts[1]}V_"
-            f"{cfg.finetune.rqvae.test_parts[0]}-{cfg.finetune.rqvae.test_parts[1]}T"
+        finetune_allowed_parts = (
+            cfg.finetune.allowed_items_parts or cfg.train.allowed_items_parts or cfg.train.sid_retriever_train_parts
         )
+        finetune_sid_retriever_split_name = (
+            f"{cfg.finetune.sid_retriever_train_parts[0]}-{cfg.finetune.sid_retriever_train_parts[1]}TR_"
+            f"{cfg.finetune.sid_retriever_val_parts[0]}-{cfg.finetune.sid_retriever_val_parts[1]}V_"
+            f"{cfg.finetune.sid_retriever_test_parts[0]}-{cfg.finetune.sid_retriever_test_parts[1]}T_"
+            f"items-{finetune_allowed_parts[0]}-{finetune_allowed_parts[1]}"
+        )
+        finetune_rqvae_split_name = (
+            f"{cfg.finetune.rqvae_train_parts[0]}-{cfg.finetune.rqvae_train_parts[1]}TR_"
+            f"{cfg.finetune.rqvae_val_parts[0]}-{cfg.finetune.rqvae_val_parts[1]}V_"
+            f"{cfg.finetune.rqvae_test_parts[0]}-{cfg.finetune.rqvae_test_parts[1]}T"
+        )
+
+        assert cfg.finetune.matching_method in ["greedy", "hungarian", "none"]
+        experiment_name = (
+            f"{pretrained_name}_finetuned_"
+            f"{cfg.finetune.sid_retriever_gap_parts[0]}-{cfg.finetune.sid_retriever_gap_parts[1]}G_"
+            f"{cfg.finetune.matching_method}_"
+            f"{finetune_sid_retriever_split_name}_"
+            f"{finetune_rqvae_split_name}"
+        )
+
         rqvae_results_path = (
             Path(cfg.paths.results_dir) / finetune_rqvae_split_name / f"rqvae-{cfg.dataset.rqvae.model_name}"
         )
 
-        assert cfg.finetune.matching_method in ["greedy", "hungarian", "none"]
-        experiment_name += (
-            f"_finetuned_on_{cfg.finetune.gap_parts[0]}-{cfg.finetune.gap_parts[1]}G_{finetune_rqvae_split_name}"
+        all_items_mapping_path_name = "all_clusters_colisionless.json"
+        train_part_mapping_path_name = (
+            f"only_{finetune_allowed_parts[0]}-{finetune_allowed_parts[1]}TR_clusters_colisionless.json"
         )
+
         if cfg.finetune.matching_method != "none":
-            experiment_name += f"_{cfg.finetune.matching_method}"
-            all_items_mapping_path_name = f"{cfg.finetune.matching_method}_{all_items_mapping_path_name}"
-            train_part_mapping_path_name = f"{cfg.finetune.matching_method}_{train_part_mapping_path_name}"
+            all_items_mapping_path_name = (
+                f"{cfg.finetune.matching_method}_to_{pretrained_rqvae_split_name}_all_clusters_colisionless.json"
+            )
+            train_part_mapping_path_name = (
+                f"{cfg.finetune.matching_method}_to_{pretrained_rqvae_split_name}_{train_part_mapping_path_name}"
+            )
+    else:
+        experiment_name = pretrained_name
+        rqvae_results_path = (
+            Path(cfg.paths.results_dir) / pretrained_rqvae_split_name / f"rqvae-{cfg.dataset.rqvae.model_name}"
+        )
+        all_items_mapping_path_name = "all_clusters_colisionless.json"
+        train_part_mapping_path_name = (
+            f"only_{pretrained_allowed_parts[0]}-{pretrained_allowed_parts[1]}TR_clusters_colisionless.json"
+        )
 
     return {
         "EXPERIMENT_NAME": experiment_name,
@@ -89,7 +119,8 @@ def generate_constants(cfg: DictConfig):
 
 def tiger_inference(cfg: DictConfig):
     consts = generate_constants(cfg)
-    logger.info(f"Generated constants: {consts}")
+    consts_str = json.dumps({k: str(v) for k, v in consts.items()}, indent=2)
+    logger.info(f"Generated constants:\n{consts_str}")
     fix_random_seed(cfg.training.seed_value)
 
     device = cfg.training.device if torch.cuda.is_available() and cfg.training.device != "cpu" else "cpu"
@@ -99,7 +130,7 @@ def tiger_inference(cfg: DictConfig):
     assert len(model_files) == 1, f"Expected exactly one model file, found {len(model_files)}"
     pretrained_model_path = max(model_files, key=lambda p: p.stat().st_mtime)
     logger.info(f"Loading pre-trained model from: {pretrained_model_path}")
-    logger.info(f"Eval parts interval: [{cfg.dataset.tiger.test_parts[0]}, {cfg.dataset.tiger.test_parts[1]})")
+    logger.info(f"Eval parts interval: [{cfg.inference.test_parts[0]}, {cfg.inference.test_parts[1]})")
     logger.info(f"Semantic IDs train mapping path: {consts['TRAIN_PART_SEMANTIC_MAPPING_PATH']}")
 
     with open(consts["ALL_ITEMS_SEMANTIC_MAPPING_PATH"]) as f:

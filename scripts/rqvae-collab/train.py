@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from codebook_utils import codebook_initialize, fix_dead_codebooks
 from loguru import logger
-from models import RQVAE
+from models import Letter
 from omegaconf import DictConfig, OmegaConf
 from torchdata.stateful_dataloader import StatefulDataLoader
 
@@ -62,32 +62,36 @@ def run_inference(model, dataloader, save_path):
 
 def generate_constants(cfg: DictConfig):
     split_name = (
-        f"{cfg.dataset.train_parts[0]}-{cfg.dataset.train_parts[1]}TR_"
-        f"{cfg.dataset.val_parts[0]}-{cfg.dataset.val_parts[1]}V_"
-        f"{cfg.dataset.test_parts[0]}-{cfg.dataset.test_parts[1]}T"
+        f"{cfg.train.rqvae_train_parts[0]}-{cfg.train.rqvae_train_parts[1]}TR_"
+        f"{cfg.train.rqvae_val_parts[0]}-{cfg.train.rqvae_val_parts[1]}V_"
+        f"{cfg.train.rqvae_test_parts[0]}-{cfg.train.rqvae_test_parts[1]}T"
     )
 
-    results_path = Path(cfg.paths.results_dir) / split_name / "rqvae-tiger"
+    results_path = Path(cfg.paths.results_dir) / split_name / "rqvae-collab"
     results_path.mkdir(parents=True, exist_ok=True)
 
     interactions_path = Path(cfg.paths.data_dir) / "all_data_interactions_with_groups.parquet"
     embeddings_path = Path(cfg.paths.data_dir) / "items_metadata_remapped.parquet"
-    experiment_name = f"tiger_{cfg.dataset.name}_{split_name}"
+    experiment_name = f"rqvae-collab_{cfg.dataset.name}_{split_name}"
+
+    collab_embeddings_path = Path(cfg.paths.results_dir) / split_name / "dense-retriever"
 
     return {
         "INTERACTIONS_PATH": interactions_path,
         "EMBEDDINGS_PATH": embeddings_path,
         "EXPERIMENT_NAME": experiment_name,
+        "COLLAB_EMBEDDINGS_PATH": collab_embeddings_path / "embeddings.pt",
         "INFERENCE_PATH": results_path / "all_clusters.json",
         "ALL_MAPPING_PATH": results_path / "all_clusters_colisionless.json",
         "OUTPUT_TRAIN_MAPPING_PATH": results_path
-        / f"only_{cfg.dataset.tiger_train_parts[0]}-{cfg.dataset.tiger_train_parts[1]}TR_clusters_colisionless.json",
+        / f"only_{cfg.train.rqvae_train_parts[0]}-{cfg.train.rqvae_train_parts[1]}TR_clusters_colisionless.json",
     }
 
 
 def train_rqvae(cfg: DictConfig):
     consts = generate_constants(cfg)
-    logger.info(f"Generated constants: {consts}")
+    consts_str = json.dumps({k: str(v) for k, v in consts.items()}, indent=2)
+    logger.info(f"Generated constants:\n{consts_str}")
     fix_random_seed(cfg.training.seed_value)
 
     device = cfg.training.device if torch.cuda.is_available() and cfg.training.device != "cpu" else "cpu"
@@ -96,7 +100,7 @@ def train_rqvae(cfg: DictConfig):
     dataset = EmbeddingsDataset(
         all_interactions_path=consts["INTERACTIONS_PATH"],
         all_embeddings_path=consts["EMBEDDINGS_PATH"],
-        train_parts=cfg.dataset.train_parts,
+        train_parts=cfg.train.rqvae_train_parts,
     )
 
     train_dataloader = StatefulDataLoader(
@@ -115,12 +119,16 @@ def train_rqvae(cfg: DictConfig):
         collate_fn=collate_fn(device),
     )
 
-    model = RQVAE(
+    cf_embeddings = torch.load(consts["COLLAB_EMBEDDINGS_PATH"], map_location="cpu")
+
+    model = Letter(
         input_dim=cfg.model.input_dim,
         num_codebooks=cfg.model.num_codebooks,
         codebook_size=cfg.model.codebook_size,
         embedding_dim=cfg.model.hidden_dim,
         beta=cfg.model.beta,
+        cf_loss_weight=1.0,
+        cf_embeddings=cf_embeddings,
     ).to(device)
 
     codebook_initialize(model, valid_dataloader)
@@ -231,7 +239,7 @@ def train_rqvae(cfg: DictConfig):
         json.dump(all_mapping, f, indent=2)
 
     train_interactions = dataset.get_interactions_by_part(
-        cfg.dataset.tiger_train_parts[0], cfg.dataset.tiger_train_parts[1]
+        cfg.train.rqvae_train_parts[0], cfg.train.rqvae_train_parts[1]
     )
 
     train_item_ids = set(train_interactions["item_id"].unique())

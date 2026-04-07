@@ -12,9 +12,7 @@ class TensorboardLogger:
         self.logdir = Path(logdir)
         self.logdir.mkdir(parents=True, exist_ok=True)
 
-        log_path = self.logdir / (
-            f"{experiment_name}_{datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')}"
-        )
+        log_path = self.logdir / (f"{experiment_name}_{datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')}")
         self.writer = SummaryWriter(log_dir=log_path)
 
     def add_metrics(self, step, metrics):
@@ -48,7 +46,7 @@ class EarlyStopper:
             return False
 
         improved = (self.minimize and current_metric < self.best_metric) or (
-                not self.minimize and current_metric > self.best_metric
+            not self.minimize and current_metric > self.best_metric
         )
 
         if improved:
@@ -60,21 +58,20 @@ class EarlyStopper:
             self.best_metric = current_metric
             self.best_model_file = self._save_model(model, current_metric)
             logger.info(
-                f"New best value for {self.metric}: {self.best_metric:.4f} "
-                f"(saved to {self.best_model_file.name})"
+                f"New best value for {self.metric}: {self.best_metric:.4f} (saved to {self.best_model_file.name})"
             )
             return False
+        else:
+            self.wait += 1
+            logger.info(f"Wait is increased to {self.wait}")
 
-        self.wait += 1
-        logger.info(f"Wait is increased to {self.wait}")
-
-        if self.wait >= self.patience:
-            logger.info(
-                f"Patience for {self.metric} is reached: "
-                f"couldn't beat value {self.best_metric:.4f} for {self.wait} calls"
-            )
-            return True
-        return False
+            if self.wait >= self.patience:
+                logger.info(
+                    f"Patience for {self.metric} is reached: "
+                    f"couldn't beat value {self.best_metric:.4f} for {self.wait} calls"
+                )
+                return True
+            return False
 
     def _save_model(self, model, metric):
         rounded_metric = round(metric, 4)

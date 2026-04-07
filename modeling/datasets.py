@@ -270,10 +270,7 @@ class FinetuneDataset(SequentialDataset):
             base_items = row["base"]
             gap_items = row["gap"]
 
-            if base_items is None:
-                history = gap_items
-            else:
-                history = base_items + gap_items
+            history = gap_items if base_items is None else base_items + gap_items
 
             if len(gap_items) < 1 or len(history) < 2:
                 continue

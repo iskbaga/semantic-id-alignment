@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 
@@ -12,7 +13,7 @@ from torch.utils.data import DataLoader
 
 sys.path.append("..")
 
-from modeling.datasets import FinetuneDataset
+from modeling.datasets import SequentialDataset
 from modeling.training import EarlyStopper, TensorboardLogger
 from modeling.utils import collate, fix_random_seed, run_evaluation
 
@@ -38,42 +39,37 @@ def generate_constants(cfg: DictConfig):
         f"{cfg.dataset.val_parts[0]}-{cfg.dataset.val_parts[1]}V_"
         f"{cfg.dataset.test_parts[0]}-{cfg.dataset.test_parts[1]}T"
     )
-    old_experiment_name = f"sasrec_{cfg.dataset.name}_{split_name}"
 
-    results_path = Path(cfg.paths.results_dir) / split_name / "sasrec"
+    results_path = Path(cfg.paths.results_dir) / split_name / "dense-retriever"
+    Path(results_path).mkdir(parents=True, exist_ok=True)
+
     interactions_path = Path(cfg.paths.data_dir) / "all_data_interactions_with_groups.parquet"
     embeddings_path = Path(cfg.paths.data_dir) / "items_metadata_remapped.parquet"
-
-    experiment_name = f"{old_experiment_name}_finetuned_on_{cfg.finetune.gap_parts[0]}-{cfg.finetune.gap_parts[1]}"
-    previous_model_mask = f"{old_experiment_name}_best_*.pth"
+    experiment_name = f"dense-retriever_{cfg.dataset.name}_{split_name}"
 
     return {
-        "SPLIT_NAME": split_name,
-        "OLD_EXPERIMENT_NAME": old_experiment_name,
-        "EXPERIMENT_NAME": experiment_name,
-        "RESULTS_PATH": results_path,
         "INTERACTIONS_PATH": interactions_path,
         "EMBEDDINGS_PATH": embeddings_path,
-        "PREVIOUS_MODEL_MASK": previous_model_mask,
+        "EXPERIMENT_NAME": experiment_name,
         "EMBEDDINGS_FILE": results_path / "embeddings.pt",
     }
 
 
-def finetune_sasrec(cfg: DictConfig):
+def train_model(cfg: DictConfig):
     consts = generate_constants(cfg)
-    logger.info(f"Generated constants: {consts}")
+    consts_str = json.dumps({k: str(v) for k, v in consts.items()}, indent=2)
+    logger.info(f"Generated constants:\n{consts_str}")
     fix_random_seed(cfg.training.seed_value)
 
     device = cfg.training.device if torch.cuda.is_available() and cfg.training.device != "cpu" else "cpu"
     logger.info(f"Using device: {device}")
 
-    data = FinetuneDataset(
+    data = SequentialDataset(
         all_interactions_path=consts["INTERACTIONS_PATH"],
         all_embeddings_path=consts["EMBEDDINGS_PATH"],
-        train_parts=cfg.finetune.train_parts,
-        gap_parts=cfg.finetune.gap_parts,
-        val_parts=cfg.finetune.val_parts,
-        test_parts=cfg.finetune.test_parts,
+        train_parts=cfg.dataset.train_parts,
+        val_parts=cfg.dataset.val_parts,
+        test_parts=cfg.dataset.test_parts,
         max_seq_len=cfg.model.max_seq_len,
     )
 
@@ -118,17 +114,6 @@ def finetune_sasrec(cfg: DictConfig):
         initializer_range=0.02,
     ).to(device)
 
-    model_files = list(Path(cfg.paths.checkpoints_dir).glob(consts["PREVIOUS_MODEL_MASK"]))
-    assert len(model_files) == 1, f"Expected exactly one model file, found {len(model_files)}"
-    finetune_model_path = max(model_files, key=lambda p: p.stat().st_mtime)
-    logger.info(f"MODEL TO FINETUNE: {finetune_model_path}")
-    state_dict = torch.load(finetune_model_path)
-    new_state_dict = {}
-    for k, v in state_dict.items():
-        new_k = k[len("module.") :] if k.startswith("module.") else k
-        new_state_dict[new_k] = v
-    model.load_state_dict(new_state_dict)
-
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -140,8 +125,6 @@ def finetune_sasrec(cfg: DictConfig):
         lr=cfg.training.lr,
     )
 
-    consts["RESULTS_PATH"].mkdir(exist_ok=True)
-
     tensorboard_logger = TensorboardLogger(experiment_name=consts["EXPERIMENT_NAME"], logdir=cfg.paths.tensorboard_dir)
 
     early_stopper = EarlyStopper(
@@ -152,7 +135,7 @@ def finetune_sasrec(cfg: DictConfig):
         experiment_name=consts["EXPERIMENT_NAME"],
     )
 
-    logger.debug("Everything is ready for finetuning process!")
+    logger.debug("Everything is ready for training process!")
 
     for epoch in range(cfg.training.num_epochs):
         logger.debug(f"Starting epoch: {epoch + 1}")
@@ -180,7 +163,7 @@ def finetune_sasrec(cfg: DictConfig):
 
     tensorboard_logger.close()
 
-    logger.info("Finetuning completed successfully!")
+    logger.info("Training completed successfully!")
 
     best_model_file = early_stopper.get_best_model_path()
     logger.info(f"Best model path is: {best_model_file}")
@@ -195,7 +178,7 @@ def finetune_sasrec(cfg: DictConfig):
 @hydra.main(version_base=None, config_path="configs", config_name="config")
 def main(cfg: DictConfig):
     logger.info(OmegaConf.to_yaml(cfg, resolve=True))
-    finetune_sasrec(cfg)
+    train_model(cfg)
 
 
 if __name__ == "__main__":

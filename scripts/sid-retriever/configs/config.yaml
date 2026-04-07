@@ -11,26 +11,28 @@ paths:
 
 dataset:
   name: "vk-lsvd"
-
   rqvae:
-    model_name: "letter"
-    train_parts: [0, 8]
-    val_parts: [8, 9]
-    test_parts: [9, 10]
+    model_name: "collab"
 
-  tiger:
-    train_parts: [0, 8]
-    val_parts: [8, 9]
-    test_parts: [9, 10]
+train:
+  sid_retriever_train_parts: [0, 8]
+  sid_retriever_val_parts: [8, 9]
+  sid_retriever_test_parts: [9, 10]
+  allowed_items_parts: [0, 8]
+  rqvae_train_parts: [0, 8]
+  rqvae_val_parts: [8, 9]
+  rqvae_test_parts: [9, 10]
 
 finetune:
-  matching_method: "hungarian" #none, hungarian or greedy
-  rqvae:
-    train_parts: [0, 8]
-    val_parts: [8, 9]
-    test_parts: [9, 10]
-  gap_parts: [8, 9]
-  test_parts: [9, 10]
+  matching_method: "hungarian"  # none, hungarian or greedy
+  sid_retriever_train_parts: [0, 8]
+  sid_retriever_gap_parts: [8, 9]
+  sid_retriever_val_parts: [8, 9]
+  sid_retriever_test_parts: [9, 10]
+  allowed_items_parts: [0, 8]
+  rqvae_train_parts: [0, 8]
+  rqvae_val_parts: [8, 9]
+  rqvae_test_parts: [9, 10]
 
 model:
   max_seq_len: 20
