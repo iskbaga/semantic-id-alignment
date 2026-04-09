@@ -127,15 +127,13 @@ def to_masked(batch, prefix, is_right_aligned=True):
     batch_size = lengths.shape[0]
     max_sequence_length = int(lengths.max())
 
-    if len(data.shape) == 1:  # only indices
-        padded_tensor = torch.zeros(
-            (batch_size, max_sequence_length), dtype=data.dtype, device=data.device
-        )  # (batch_size, max_seq_len)
+    if len(data.shape) == 1:
+        padded_tensor = torch.zeros((batch_size, max_sequence_length), dtype=data.dtype, device=data.device)
     else:
-        assert len(data.shape) == 2  # embeddings
+        assert len(data.shape) == 2
         padded_tensor = torch.zeros(
             (batch_size, max_sequence_length, data.shape[-1]), dtype=data.dtype, device=data.device
-        )  # (batch_size, max_seq_len, emb_dim)
+        )
 
     mask = torch.arange(max_sequence_length, device=lengths.device)[None] < lengths[:, None]
 

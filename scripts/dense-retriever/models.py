@@ -78,7 +78,7 @@ class TransformerEncoder(nn.Module):
         return padded_embeddings[mask]
 
 
-class SasRecModel(nn.Module):
+class SASRecModel(nn.Module):
     def __init__(
         self,
         num_items,
@@ -134,64 +134,56 @@ class SasRecModel(nn.Module):
                 raise ValueError(f"Unknown transformer weight: {key}")
 
     def forward(self, inputs):
-        all_sample_events = inputs["item.ids"]  # (total_batch_items)
-        all_sample_lengths = inputs["item.length"]  # (batch_size)
+        all_sample_events = inputs["item.ids"]
+        all_sample_lengths = inputs["item.length"]
 
-        all_positive_sample_events = inputs["label.ids"]  # (total_batch_items)
-        all_positive_sample_lengths = inputs["label.length"]  # (batch_size)
+        all_positive_sample_events = inputs["label.ids"]
+        all_positive_sample_lengths = inputs["label.length"]
 
         max_seqlen = int(all_sample_lengths.max().item())
 
         embeddings = self._item_embeddings(all_sample_events)
 
-        end_indices = all_sample_lengths.cumsum(dim=0)  # (batch_size)
-        start_indices = end_indices - all_sample_lengths  # (batch_size)
+        end_indices = all_sample_lengths.cumsum(dim=0)
+        start_indices = end_indices - all_sample_lengths
 
         sample_indices = torch.arange(all_sample_lengths.shape[0], device=all_sample_lengths.device).repeat_interleave(
             all_sample_lengths
-        )  # (total_batch_items)
+        )
 
         positions = (
             torch.arange(all_sample_events.shape[0], device=all_sample_events.device) - start_indices[sample_indices]
-        )  # (total_batch_items)
+        )
 
-        position_embeddings = self._position_embeddings(positions)  # (total_batch_items, embedding_dim)
+        position_embeddings = self._position_embeddings(positions)
 
-        embeddings = embeddings + position_embeddings  # (total_batch_items, embedding_dim)
+        embeddings = embeddings + position_embeddings
 
-        all_sample_embeddings = self._encoder(
-            embeddings=embeddings, lengths=all_sample_lengths, max_seqlen=max_seqlen
-        )  # (total_batch_items, embedding_dim)
+        all_sample_embeddings = self._encoder(embeddings=embeddings, lengths=all_sample_lengths, max_seqlen=max_seqlen)
 
-        all_embeddings = self._item_embeddings.weight  # (num_items, embedding_dim)
+        all_embeddings = self._item_embeddings.weight
 
         if self.training:
             if "num_train_items" in inputs:
-                num_train_items = inputs["num_train_items"]  # (batch_size)
+                num_train_items = inputs["num_train_items"]
                 train_items_mask = torch.zeros_like(all_positive_sample_events)
 
-                starts = torch.cumsum(all_sample_lengths, dim=0) - all_sample_lengths  # (batch_size)
-                ends = starts + all_sample_lengths  # (batch_size)
-                train_starts = ends - torch.minimum(num_train_items, all_sample_lengths)  # (batch_size)
+                starts = torch.cumsum(all_sample_lengths, dim=0) - all_sample_lengths
+                ends = starts + all_sample_lengths
+                train_starts = ends - torch.minimum(num_train_items, all_sample_lengths)
 
                 ones = torch.ones_like(train_starts, dtype=train_items_mask.dtype)
                 train_items_mask.scatter_add_(0, train_starts, ones)
                 train_items_mask.scatter_add_(0, ends[:-1], -ones[:-1])
 
-                train_items_mask = torch.cumsum(train_items_mask, dim=-1) > 0  # (batch_size)
+                train_items_mask = torch.cumsum(train_items_mask, dim=-1) > 0
                 all_sample_embeddings = all_sample_embeddings[train_items_mask]
                 all_positive_sample_events = all_positive_sample_events[train_items_mask]
 
-            # a -- batch_size, n -- num_items, d -- embedding_dim
-            all_scores = torch.einsum(
-                "ad,nd->an", all_sample_embeddings, all_embeddings
-            )  # (total_batch_items, num_items)
+            all_scores = torch.einsum("ad,nd->an", all_sample_embeddings, all_embeddings)
 
-            positive_scores = torch.gather(input=all_scores, dim=1, index=all_positive_sample_events[..., None])[
-                :, 0
-            ]  # (total_batch_items)
+            positive_scores = torch.gather(input=all_scores, dim=1, index=all_positive_sample_events[..., None])[:, 0]
 
-            # Compute loss
             negative_scores = torch.gather(
                 input=all_scores,
                 dim=1,
@@ -201,7 +193,7 @@ class SasRecModel(nn.Module):
                     size=all_positive_sample_events.shape,
                     device=all_positive_sample_events.device,
                 )[..., None],
-            )[:, 0]  # (total_batch_items)
+            )[:, 0]
 
             with torch.autocast(device_type="cuda", enabled=False):
                 loss = self._compute_loss(positive_scores.float(), negative_scores.float())
@@ -214,18 +206,15 @@ class SasRecModel(nn.Module):
             offsets = torch.cumsum(all_sample_lengths, dim=-1)
             all_sample_embeddings = all_sample_embeddings[offsets - 1]
 
-            # a -- batch_size, n -- num_items, d -- embedding_dim
-            all_scores = torch.einsum(
-                "ad,nd->an", all_sample_embeddings, all_embeddings
-            )  # (total_batch_items, num_items)
+            all_scores = torch.einsum("ad,nd->an", all_sample_embeddings, all_embeddings)
 
             positive_items, _ = create_masked_tensor(
                 data=all_positive_sample_events, lengths=all_positive_sample_lengths, padding_value=-1
-            )  # (batch_size, num_pos)
+            )
 
-            _, topk_indices = torch.topk(all_scores, k=20, dim=-1, largest=True, sorted=True)  # (batch_size, max_k)
+            _, topk_indices = torch.topk(all_scores, k=20, dim=-1, largest=True, sorted=True)
 
-            all_hits = torch.eq(positive_items[:, None, :], topk_indices[:, :, None]).any(dim=-1)  # (batch_size, max_k)
+            all_hits = torch.eq(positive_items[:, None, :], topk_indices[:, :, None]).any(dim=-1)
 
             for k in [1, 5, 10, 20]:
                 metrics[f"recall@{k}"] = recall(all_hits=all_hits, positive_lengths=all_positive_sample_lengths, k=k)
@@ -245,22 +234,22 @@ class SasRecModel(nn.Module):
 
 
 def recall(all_hits: torch.Tensor, positive_lengths: torch.Tensor, k: int) -> torch.Tensor:
-    hits = all_hits[:, :k].float()  # (batch_size, k)
-    num_positives_clamped = torch.clamp(positive_lengths, max=k).to(torch.long)  # (batch_size)
-    recall = hits.sum(dim=-1) / num_positives_clamped  # (batch_size)
+    hits = all_hits[:, :k].float()
+    num_positives_clamped = torch.clamp(positive_lengths, max=k).to(torch.long)
+    recall = hits.sum(dim=-1) / num_positives_clamped
 
     return recall.mean()
 
 
 def ndcg(all_hits: torch.Tensor, positive_lengths: torch.Tensor, k: int) -> torch.Tensor:
-    hits = all_hits[:, :k].float()  # (batch_size, k)
+    hits = all_hits[:, :k].float()
 
-    num_positives_clamped = torch.clamp(positive_lengths, max=k).to(torch.long)  # (batch_size)
-    positions = torch.arange(1, k + 1, device=positive_lengths.device).float()  # (k)
-    discounts = 1.0 / torch.log2(positions + 1.0)  # (k)
+    num_positives_clamped = torch.clamp(positive_lengths, max=k).to(torch.long)
+    positions = torch.arange(1, k + 1, device=positive_lengths.device).float()
+    discounts = 1.0 / torch.log2(positions + 1.0)
 
-    dcg = (hits * discounts[None, :]).sum(dim=1)  # (batch_size)
-    idcg = torch.cumsum(discounts, dim=0)[num_positives_clamped - 1]  # (batch_size)
-    ndcg = dcg / idcg  # (batch_size)
+    dcg = (hits * discounts[None, :]).sum(dim=1)
+    idcg = torch.cumsum(discounts, dim=0)[num_positives_clamped - 1]
+    ndcg = dcg / idcg
 
     return ndcg.mean()

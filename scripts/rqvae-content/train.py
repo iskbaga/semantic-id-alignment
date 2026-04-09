@@ -220,9 +220,10 @@ def train_rqvae(cfg: DictConfig):
         all_mapping[int(item_id)] = clusters
         sem_2_ids[tuple(clusters)].append(int(item_id))
 
+    collision_rng = np.random.default_rng(cfg.training.seed_value)
     for items in sem_2_ids.values():
         assert len(items) <= cfg.model.codebook_size, str(len(items))
-        collision_solvers = np.random.permutation(cfg.model.codebook_size)[: len(items)].tolist()
+        collision_solvers = collision_rng.permutation(cfg.model.codebook_size)[: len(items)].tolist()
         for item_id, collision_solver in zip(items, collision_solvers, strict=True):
             all_mapping[item_id].append(collision_solver)
             for i in range(len(all_mapping[item_id])):

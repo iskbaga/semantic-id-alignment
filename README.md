@@ -7,11 +7,6 @@ The repository contains the complete source code and experimental assets require
 - Training code for **dense retriever**, **RQ‑VAE tokenizers** (content-based / collaborative), and **SID-based retriever**
 - A **checkpoint-compatible Semantic ID (SID) refresh** via **token alignment** (Greedy / Hungarian)
 
-This repo contains:
-- data preparation notebooks for Amazon Beauty, Yambda, and VK-LSVD;
-- training code for dense retriever, RQ-VAE tokenizers (content/collaborative), and SID-based retriever;
-- SID refresh workflow with token alignment (greedy or Hungarian).
-
 ## Repository layout
 
 ```text
@@ -84,11 +79,11 @@ python dense-retriever/train.py
 2) Train tokenizer:
 
 ```bash
-# Collaborative (uses dense retriever collaborative embeddings)
-python rqvae-collab/train.py
-
 # Content (uses content embeddings)
 python rqvae-content/train.py
+
+# Collaborative (uses dense retriever collaborative embeddings)
+python rqvae-collab/train.py
 ```
 
 3) Train base SID retriever:

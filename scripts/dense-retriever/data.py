@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class SasRecTrainDataset:
+class SASRecTrainDataset:
     def __init__(self, dataset):
         self._dataset = dataset
 
@@ -29,7 +29,7 @@ class SasRecTrainDataset:
         return len(self._dataset)
 
 
-class SasRecEvalDataset:
+class SASRecEvalDataset:
     def __init__(self, dataset):
         self._dataset = dataset
 

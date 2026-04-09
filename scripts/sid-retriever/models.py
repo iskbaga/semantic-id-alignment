@@ -27,18 +27,14 @@ class CorrectItemsLogitsProcessorGPT(LogitsProcessor):
             allowed_mask[:, first_tokens] = True
         else:
             prefix_len = next_sid_codebook_num
-            current_prefix = input_ids[:, -prefix_len:]  # (batch_beams, seq_len)
-            item_prefixes = self.index_semantic_ids[:, :prefix_len]  # (all_sequences, seq_len)
+            current_prefix = input_ids[:, -prefix_len:]
+            item_prefixes = self.index_semantic_ids[:, :prefix_len]
 
-            matches = (current_prefix[:, None] == item_prefixes[None,]).all(dim=-1)  # (batch_beams, all_sequences)
+            matches = (current_prefix[:, None] == item_prefixes[None,]).all(dim=-1)
 
-            next_tokens = self.index_semantic_ids[:, prefix_len][None].expand(
-                batch_beams, -1
-            )  # (batch_beams, all_sequences)
+            next_tokens = self.index_semantic_ids[:, prefix_len][None].expand(batch_beams, -1)
 
-            row_ids = torch.arange(batch_beams, device=self.device)[:, None].expand_as(
-                next_tokens
-            )  # (batch_beams, all_sequences)
+            row_ids = torch.arange(batch_beams, device=self.device)[:, None].expand_as(next_tokens)
 
             allowed_mask[row_ids[matches], next_tokens[matches]] = True
 
@@ -183,19 +179,15 @@ class TigerGptModel(nn.Module):
                 logits_processor=[self.logits_processor] if self.logits_processor is not None else [],
             )[:, -self._sem_id_len :]
 
-            predicted_sids = output.reshape(
-                -1, self._num_return_sequences, self._sem_id_len
-            )  # (batch_size, k, seq_len)
+            predicted_sids = output.reshape(-1, self._num_return_sequences, self._sem_id_len)
 
             positive_length = inputs["label.length"].float()
             positive_semantic_ids = inputs["label.semantic.padded"].long()
 
-            positive_semantic_ids = positive_semantic_ids.reshape(
-                positive_semantic_ids.shape[0], -1, self._sem_id_len
-            )  # (batch_size, pos_num, seq_len)
+            positive_semantic_ids = positive_semantic_ids.reshape(positive_semantic_ids.shape[0], -1, self._sem_id_len)
             all_hits = (
                 torch.eq(predicted_sids[:, :, None, :], positive_semantic_ids[:, None, :, :]).all(dim=-1).any(dim=-1)
-            )  # (batch_size, k)
+            )
 
             for k in [1, 5, 10, 20]:
                 metrics[f"recall@{k}"] = recall(all_hits=all_hits, positive_lengths=positive_length, k=k)
@@ -206,21 +198,21 @@ class TigerGptModel(nn.Module):
 
 
 def recall(all_hits: torch.Tensor, positive_lengths: torch.Tensor, k: int) -> torch.Tensor:
-    hits = all_hits[:, :k].float()  # (batch_size, k)
-    num_positives_clamped = torch.clamp(positive_lengths, max=k).to(torch.long)  # (batch_size)
-    recall = hits.sum(dim=-1) / num_positives_clamped  # (batch_size)
+    hits = all_hits[:, :k].float()
+    num_positives_clamped = torch.clamp(positive_lengths, max=k).to(torch.long)
+    recall = hits.sum(dim=-1) / num_positives_clamped
     return recall.mean()
 
 
 def ndcg(all_hits: torch.Tensor, positive_lengths: torch.Tensor, k: int) -> torch.Tensor:
-    hits = all_hits[:, :k].float()  # (batch_size, k)
+    hits = all_hits[:, :k].float()
 
-    num_positives_clamped = torch.clamp(positive_lengths, max=k).to(torch.long)  # (batch_size)
-    positions = torch.arange(1, k + 1, device=positive_lengths.device).float()  # (k)
-    discounts = 1.0 / torch.log2(positions + 1.0)  # (k)
+    num_positives_clamped = torch.clamp(positive_lengths, max=k).to(torch.long)
+    positions = torch.arange(1, k + 1, device=positive_lengths.device).float()
+    discounts = 1.0 / torch.log2(positions + 1.0)
 
-    dcg = (hits * discounts[None, :]).sum(dim=1)  # (batch_size)
-    idcg = torch.cumsum(discounts, dim=0)[num_positives_clamped - 1]  # (batch_size)
-    ndcg = dcg / idcg  # (batch_size)
+    dcg = (hits * discounts[None, :]).sum(dim=1)
+    idcg = torch.cumsum(discounts, dim=0)[num_positives_clamped - 1]
+    ndcg = dcg / idcg
 
     return ndcg.mean()

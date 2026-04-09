@@ -22,7 +22,7 @@ def collate(batch):
             processed_batch[key] = torch.empty(size=(0,), dtype=values[0].dtype)
             values = [value for value in values if value.numel() > 0]
             if len(values) > 0:
-                if values[0].ndim == 0:  # These are numbers
+                if values[0].ndim == 0:
                     processed_batch[key] = torch.stack(values)
                 else:
                     processed_batch[key] = torch.cat(values)

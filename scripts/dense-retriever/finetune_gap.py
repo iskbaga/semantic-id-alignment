@@ -4,11 +4,12 @@ from pathlib import Path
 
 import hydra
 import torch
-from data import SasRecEvalDataset, SasRecTrainDataset
 from loguru import logger
-from models import SasRecModel
+from models import SASRecModel
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
+
+from data import SASRecEvalDataset, SASRecTrainDataset
 
 
 sys.path.append("..")
@@ -79,9 +80,9 @@ def finetune_sasrec(cfg: DictConfig):
         max_seq_len=cfg.model.max_seq_len,
     )
 
-    train_dataset = SasRecTrainDataset(data.train_samples)
-    valid_dataset = SasRecEvalDataset(data.val_samples)
-    eval_dataset = SasRecEvalDataset(data.test_samples)
+    train_dataset = SASRecTrainDataset(data.train_samples)
+    valid_dataset = SASRecEvalDataset(data.val_samples)
+    eval_dataset = SASRecEvalDataset(data.test_samples)
 
     train_dataloader = DataLoader(
         dataset=train_dataset,
@@ -107,7 +108,7 @@ def finetune_sasrec(cfg: DictConfig):
         collate_fn=collate_fn(device),
     )
 
-    model = SasRecModel(
+    model = SASRecModel(
         num_items=data.num_items,
         max_sequence_length=cfg.model.max_seq_len,
         embedding_dim=cfg.model.embedding_dim,
