@@ -2,18 +2,21 @@ import torch
 import torch.nn as nn
 
 
-class RQVAE(nn.Module):
+class Letter(nn.Module):
     def __init__(
-            self,
-            input_dim,
-            num_codebooks,
-            codebook_size,
-            embedding_dim,
-            beta=0.25,
-            quant_loss_weight=1.0,
+        self,
+        input_dim,
+        num_codebooks,
+        codebook_size,
+        embedding_dim,
+        beta=0.25,
+        quant_loss_weight=1.0,
+        cf_loss_weight=1.0,
+        cf_embeddings=None,
     ):
         super().__init__()
-        self.register_buffer('beta', torch.tensor(beta))
+        self.register_buffer("beta", torch.tensor(beta))
+        self.register_buffer("cf_embeddings", cf_embeddings.float())
 
         self.input_dim = input_dim
         self.num_codebooks = num_codebooks
@@ -21,8 +24,7 @@ class RQVAE(nn.Module):
         self.embedding_dim = embedding_dim
         self.quant_loss_weight = quant_loss_weight
 
-        self.encoder = self.make_encoding_tower(input_dim, embedding_dim)
-        self.decoder = self.make_encoding_tower(embedding_dim, input_dim)
+        self.cf_loss_weight = cf_loss_weight
 
         self.codebooks = torch.nn.ParameterList()
         for _ in range(num_codebooks):
@@ -30,22 +32,13 @@ class RQVAE(nn.Module):
             self.codebooks.append(cb)
 
     @staticmethod
-    def make_encoding_tower(d1, d2, bias=False):
-        return torch.nn.Sequential(
-            nn.Linear(d1, d1),
-            nn.ReLU(),
-            nn.Linear(d1, d2),
-            nn.ReLU(),
-            nn.Linear(d2, d2, bias=bias)
-        )
-
-    @staticmethod
     def get_codebook_indices(remainder, codebook):
         dist = torch.cdist(remainder, codebook)
         return dist.argmin(dim=-1)
 
     def forward(self, inputs):
-        latent_vector = self.encoder(inputs['embedding'])
+        item_ids = inputs["item_id"]
+        latent_vector = self.cf_embeddings[item_ids]
 
         latent_restored = 0
         rqvae_loss = 0
@@ -64,21 +57,16 @@ class RQVAE(nn.Module):
             latent_restored += codebook_vectors
             remainder = remainder - codebook_vectors
 
-        embeddings_restored = self.decoder(latent_restored)
-        recon_loss = torch.nn.functional.mse_loss(embeddings_restored, inputs['embedding'])
+        recon_loss = torch.nn.functional.mse_loss(latent_restored, latent_vector)
 
         loss = (recon_loss + self.quant_loss_weight * rqvae_loss).mean()
 
-        clusters_counts = []
-        for cluster in clusters:
-            clusters_counts.append(torch.bincount(cluster, minlength=self.codebook_size))
+        clusters_counts = [torch.bincount(cluster, minlength=self.codebook_size) for cluster in clusters]
 
         return loss, {
-            'loss': loss.item(),
-            'recon_loss': recon_loss.mean().item(),
-            'rqvae_loss': rqvae_loss.mean().item(),
-
-            'clusters_counts': clusters_counts,
-            'clusters': torch.stack(clusters).T,
-            'embedding_hat': embeddings_restored,
+            "loss": loss.item(),
+            "recon_loss": recon_loss.mean().item(),
+            "rqvae_loss": rqvae_loss.mean().item(),
+            "clusters_counts": clusters_counts,
+            "clusters": torch.stack(clusters).T,
         }

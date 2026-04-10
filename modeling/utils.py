@@ -9,7 +9,7 @@ def collate(batch):
     assert batch and isinstance(batch, list), batch
     processed_batch = {}
 
-    for key in batch[0].keys():
+    for key in batch[0]:
         values = [sample[key] for sample in batch]
         if isinstance(values[0], dict):
             processed_batch[key] = collate(values)
@@ -22,7 +22,7 @@ def collate(batch):
             processed_batch[key] = torch.empty(size=(0,), dtype=values[0].dtype)
             values = [value for value in values if value.numel() > 0]
             if len(values) > 0:
-                if values[0].ndim == 0:  # These are numbers
+                if values[0].ndim == 0:
                     processed_batch[key] = torch.stack(values)
                 else:
                     processed_batch[key] = torch.cat(values)
@@ -57,7 +57,7 @@ def run_evaluation(model, dataloader, prefix, metric_names=None):
 
     final_metrics = {}
     for metric, values in metrics_data.items():
-        final_metrics[f'{prefix}{metric}'] = sum(values) / len(values) if values else 0.0
+        final_metrics[f"{prefix}{metric}"] = sum(values) / len(values) if values else 0.0
     return final_metrics
 
 
@@ -69,4 +69,4 @@ def fix_random_seed(seed):
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
