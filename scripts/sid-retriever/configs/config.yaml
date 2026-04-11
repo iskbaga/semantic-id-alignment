@@ -57,7 +57,7 @@ training:
   lr: 1e-4
   patience: 40
   minimize_metric: false
-  metric: "eval/ndcg@20"
+  metric: "validation/ndcg@20"
 
 inference:
   use_finetune_model: True

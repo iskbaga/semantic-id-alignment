@@ -100,6 +100,10 @@ def train_model(cfg: DictConfig):
         data.train_samples, all_semantics_mapping_array, cfg.model.num_codebooks, cfg.model.num_user_hash
     )
 
+    valid_dataset = TigerEvalDataset(
+        data.val_samples, all_semantics_mapping_array, cfg.model.num_codebooks, cfg.model.num_user_hash
+    )
+
     eval_dataset = TigerEvalDataset(
         data.test_samples, all_semantics_mapping_array, cfg.model.num_codebooks, cfg.model.num_user_hash
     )
@@ -110,6 +114,14 @@ def train_model(cfg: DictConfig):
         shuffle=True,
         drop_last=True,
         collate_fn=create_collate_fn(cfg.model.num_codebooks, cfg.model.codebook_size, device, is_eval=False),
+    )
+
+    valid_dataloader = DataLoader(
+        dataset=valid_dataset,
+        batch_size=cfg.training.valid_batch_size,
+        shuffle=False,
+        drop_last=False,
+        collate_fn=create_collate_fn(cfg.model.num_codebooks, cfg.model.codebook_size, device, is_eval=True),
     )
 
     eval_dataloader = DataLoader(
@@ -177,11 +189,15 @@ def train_model(cfg: DictConfig):
 
             losses.append(outputs["loss"].item())
 
-        all_metrics = {"train/loss": sum(losses) / len(losses)}
+        train_metrics = {"train/loss": sum(losses) / len(losses)}
+        all_metrics = train_metrics.copy()
 
-        if (epoch + 1) % 2 == 0:
-            logger.info("Doing evaluation")
+        if (epoch + 1) % 4 == 0:
+            logger.info("Doing validation")
+            validation_metrics = run_evaluation(model, valid_dataloader, "validation/")
+            all_metrics.update(validation_metrics)
 
+            logger.info("Doing test evaluation")
             eval_metrics = run_evaluation(model, eval_dataloader, "eval/")
             all_metrics.update(eval_metrics)
 

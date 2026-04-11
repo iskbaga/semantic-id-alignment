@@ -149,6 +149,10 @@ def train_tiger_finetune(cfg: DictConfig):
         data.train_samples, all_semantics_mapping_array, cfg.model.num_codebooks, cfg.model.num_user_hash
     )
 
+    valid_dataset = TigerEvalDataset(
+        data.val_samples, all_semantics_mapping_array, cfg.model.num_codebooks, cfg.model.num_user_hash
+    )
+
     eval_dataset = TigerEvalDataset(
         data.test_samples, all_semantics_mapping_array, cfg.model.num_codebooks, cfg.model.num_user_hash
     )
@@ -159,6 +163,14 @@ def train_tiger_finetune(cfg: DictConfig):
         shuffle=True,
         drop_last=True,
         collate_fn=create_collate_fn(cfg.model.num_codebooks, cfg.model.codebook_size, device, is_eval=False),
+    )
+
+    valid_dataloader = DataLoader(
+        dataset=valid_dataset,
+        batch_size=cfg.training.valid_batch_size,
+        shuffle=False,
+        drop_last=False,
+        collate_fn=create_collate_fn(cfg.model.num_codebooks, cfg.model.codebook_size, device, is_eval=True),
     )
 
     eval_dataloader = DataLoader(
@@ -231,9 +243,12 @@ def train_tiger_finetune(cfg: DictConfig):
 
         all_metrics = {"train/loss": sum(losses) / len(losses)}
 
-        if (epoch + 1) % 2 == 0:
-            logger.info("Doing evaluation")
+        if (epoch + 1) % 4 == 0:
+            logger.info("Doing validation")
+            validation_metrics = run_evaluation(model, valid_dataloader, "validation/")
+            all_metrics.update(validation_metrics)
 
+            logger.info("Doing test evaluation")
             eval_metrics = run_evaluation(model, eval_dataloader, "eval/")
             all_metrics.update(eval_metrics)
 
