@@ -12,14 +12,12 @@ paths:
 dataset:
   name: "vk-lsvd"
   train_parts: [0, 8]
-  val_parts: [8, 9]
-  test_parts: [9, 10]
+  eval_parts: [9, 10]
 
 finetune:
   train_parts: [0, 8]
   gap_parts: [8, 9]
-  val_parts: [9, 10]
-  test_parts: [9, 10]
+  eval_parts: [9, 10]
 
 model:
   max_seq_len: 20

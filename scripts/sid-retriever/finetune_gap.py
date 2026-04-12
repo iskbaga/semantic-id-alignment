@@ -46,14 +46,12 @@ def generate_constants(cfg: DictConfig):
     pretrained_allowed_parts = cfg.train.allowed_items_parts or cfg.train.sid_retriever_train_parts
     pretrained_sid_retriever_split_name = (
         f"{cfg.train.sid_retriever_train_parts[0]}-{cfg.train.sid_retriever_train_parts[1]}TR_"
-        f"{cfg.train.sid_retriever_val_parts[0]}-{cfg.train.sid_retriever_val_parts[1]}V_"
-        f"{cfg.train.sid_retriever_test_parts[0]}-{cfg.train.sid_retriever_test_parts[1]}T_"
+        f"{cfg.train.sid_retriever_eval_parts[0]}-{cfg.train.sid_retriever_eval_parts[1]}TE_"
         f"items-{pretrained_allowed_parts[0]}-{pretrained_allowed_parts[1]}"
     )
     pretrained_rqvae_split_name = (
         f"{cfg.train.rqvae_train_parts[0]}-{cfg.train.rqvae_train_parts[1]}TR_"
-        f"{cfg.train.rqvae_val_parts[0]}-{cfg.train.rqvae_val_parts[1]}V_"
-        f"{cfg.train.rqvae_test_parts[0]}-{cfg.train.rqvae_test_parts[1]}T"
+        f"{cfg.train.rqvae_eval_parts[0]}-{cfg.train.rqvae_eval_parts[1]}TE"
     )
 
     pretrained_name = (
@@ -65,14 +63,12 @@ def generate_constants(cfg: DictConfig):
     )
     finetune_sid_retriever_split_name = (
         f"{cfg.finetune.sid_retriever_train_parts[0]}-{cfg.finetune.sid_retriever_train_parts[1]}TR_"
-        f"{cfg.finetune.sid_retriever_val_parts[0]}-{cfg.finetune.sid_retriever_val_parts[1]}V_"
-        f"{cfg.finetune.sid_retriever_test_parts[0]}-{cfg.finetune.sid_retriever_test_parts[1]}T_"
+        f"{cfg.finetune.sid_retriever_eval_parts[0]}-{cfg.finetune.sid_retriever_eval_parts[1]}TE_"
         f"items-{finetune_allowed_parts[0]}-{finetune_allowed_parts[1]}"
     )
     finetune_rqvae_split_name = (
         f"{cfg.finetune.rqvae_train_parts[0]}-{cfg.finetune.rqvae_train_parts[1]}TR_"
-        f"{cfg.finetune.rqvae_val_parts[0]}-{cfg.finetune.rqvae_val_parts[1]}V_"
-        f"{cfg.finetune.rqvae_test_parts[0]}-{cfg.finetune.rqvae_test_parts[1]}T"
+        f"{cfg.finetune.rqvae_eval_parts[0]}-{cfg.finetune.rqvae_eval_parts[1]}TE"
     )
 
     assert cfg.finetune.matching_method in ["greedy", "hungarian", "none"]
@@ -140,8 +136,7 @@ def train_tiger_finetune(cfg: DictConfig):
         all_embeddings_path=consts["EMBEDDINGS_PATH"],
         train_parts=cfg.finetune.sid_retriever_train_parts,
         gap_parts=cfg.finetune.sid_retriever_gap_parts,
-        val_parts=cfg.finetune.sid_retriever_val_parts,
-        test_parts=cfg.finetune.sid_retriever_test_parts,
+        eval_parts=cfg.finetune.sid_retriever_eval_parts,
         max_seq_len=cfg.model.max_seq_len,
     )
 
@@ -154,7 +149,7 @@ def train_tiger_finetune(cfg: DictConfig):
     )
 
     eval_dataset = TigerEvalDataset(
-        data.test_samples, all_semantics_mapping_array, cfg.model.num_codebooks, cfg.model.num_user_hash
+        data.eval_samples, all_semantics_mapping_array, cfg.model.num_codebooks, cfg.model.num_user_hash
     )
 
     train_dataloader = DataLoader(
@@ -250,6 +245,7 @@ def train_tiger_finetune(cfg: DictConfig):
 
     tensorboard_logger.close()
 
+    Path(cfg.paths.checkpoints_dir).mkdir(parents=True, exist_ok=True)
     last_model_path = Path(cfg.paths.checkpoints_dir) / f"{consts['EXPERIMENT_NAME']}_last.pth"
     torch.save(model.state_dict(), last_model_path)
     logger.info(f"Last model saved to: {last_model_path}")

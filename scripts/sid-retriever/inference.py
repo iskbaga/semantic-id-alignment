@@ -43,14 +43,12 @@ def generate_constants(cfg: DictConfig):
     pretrained_allowed_parts = cfg.train.allowed_items_parts or cfg.train.sid_retriever_train_parts
     pretrained_sid_retriever_split_name = (
         f"{cfg.train.sid_retriever_train_parts[0]}-{cfg.train.sid_retriever_train_parts[1]}TR_"
-        f"{cfg.train.sid_retriever_val_parts[0]}-{cfg.train.sid_retriever_val_parts[1]}V_"
-        f"{cfg.train.sid_retriever_test_parts[0]}-{cfg.train.sid_retriever_test_parts[1]}T_"
+        f"{cfg.train.sid_retriever_eval_parts[0]}-{cfg.train.sid_retriever_eval_parts[1]}TE_"
         f"items-{pretrained_allowed_parts[0]}-{pretrained_allowed_parts[1]}"
     )
     pretrained_rqvae_split_name = (
         f"{cfg.train.rqvae_train_parts[0]}-{cfg.train.rqvae_train_parts[1]}TR_"
-        f"{cfg.train.rqvae_val_parts[0]}-{cfg.train.rqvae_val_parts[1]}V_"
-        f"{cfg.train.rqvae_test_parts[0]}-{cfg.train.rqvae_test_parts[1]}T"
+        f"{cfg.train.rqvae_eval_parts[0]}-{cfg.train.rqvae_eval_parts[1]}TE"
     )
 
     pretrained_name = (
@@ -63,14 +61,12 @@ def generate_constants(cfg: DictConfig):
         )
         finetune_sid_retriever_split_name = (
             f"{cfg.finetune.sid_retriever_train_parts[0]}-{cfg.finetune.sid_retriever_train_parts[1]}TR_"
-            f"{cfg.finetune.sid_retriever_val_parts[0]}-{cfg.finetune.sid_retriever_val_parts[1]}V_"
-            f"{cfg.finetune.sid_retriever_test_parts[0]}-{cfg.finetune.sid_retriever_test_parts[1]}T_"
+            f"{cfg.finetune.sid_retriever_eval_parts[0]}-{cfg.finetune.sid_retriever_eval_parts[1]}TE_"
             f"items-{finetune_allowed_parts[0]}-{finetune_allowed_parts[1]}"
         )
         finetune_rqvae_split_name = (
             f"{cfg.finetune.rqvae_train_parts[0]}-{cfg.finetune.rqvae_train_parts[1]}TR_"
-            f"{cfg.finetune.rqvae_val_parts[0]}-{cfg.finetune.rqvae_val_parts[1]}V_"
-            f"{cfg.finetune.rqvae_test_parts[0]}-{cfg.finetune.rqvae_test_parts[1]}T"
+            f"{cfg.finetune.rqvae_eval_parts[0]}-{cfg.finetune.rqvae_eval_parts[1]}TE"
         )
 
         assert cfg.finetune.matching_method in ["greedy", "hungarian", "none"]
@@ -131,7 +127,7 @@ def tiger_inference(cfg: DictConfig):
     assert len(model_files) == 1, f"Expected exactly one model file, found {len(model_files)}"
     pretrained_model_path = max(model_files, key=lambda p: p.stat().st_mtime)
     logger.info(f"Loading pre-trained model from: {pretrained_model_path}")
-    logger.info(f"Eval parts interval: [{cfg.inference.test_parts[0]}, {cfg.inference.test_parts[1]})")
+    logger.info(f"Eval parts interval: [{cfg.inference.eval_parts[0]}, {cfg.inference.eval_parts[1]})")
     logger.info(f"Semantic IDs train mapping path: {consts['TRAIN_PART_SEMANTIC_MAPPING_PATH']}")
 
     with open(consts["ALL_ITEMS_SEMANTIC_MAPPING_PATH"]) as f:
@@ -141,17 +137,16 @@ def tiger_inference(cfg: DictConfig):
 
     all_semantics_mapping_array = create_semantic_mapping_array(all_mappings, cfg.model.num_codebooks)
 
-    test_samples = SequentialDataset(
+    eval_samples = SequentialDataset(
         all_interactions_path=consts["INTERACTIONS_PATH"],
         all_embeddings_path=consts["EMBEDDINGS_PATH"],
-        train_parts=[0, cfg.inference.test_parts[0]],
-        val_parts=[0, cfg.inference.test_parts[0]],
-        test_parts=cfg.inference.test_parts,
+        train_parts=[0, cfg.inference.eval_parts[0]],
+        eval_parts=cfg.inference.eval_parts,
         max_seq_len=cfg.model.max_seq_len,
-    ).test_samples
+    ).eval_samples
 
     eval_dataset = TigerEvalDataset(
-        test_samples, all_semantics_mapping_array, cfg.model.num_codebooks, cfg.model.num_user_hash
+        eval_samples, all_semantics_mapping_array, cfg.model.num_codebooks, cfg.model.num_user_hash
     )
 
     eval_dataloader = DataLoader(

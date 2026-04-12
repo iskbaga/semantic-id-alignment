@@ -37,8 +37,7 @@ def collate_fn(device):
 def generate_constants(cfg: DictConfig):
     split_name = (
         f"{cfg.dataset.train_parts[0]}-{cfg.dataset.train_parts[1]}TR_"
-        f"{cfg.dataset.val_parts[0]}-{cfg.dataset.val_parts[1]}V_"
-        f"{cfg.dataset.test_parts[0]}-{cfg.dataset.test_parts[1]}T"
+        f"{cfg.dataset.eval_parts[0]}-{cfg.dataset.eval_parts[1]}TE"
     )
 
     results_path = Path(cfg.paths.results_dir) / split_name / "dense-retriever"
@@ -69,28 +68,18 @@ def train_model(cfg: DictConfig):
         all_interactions_path=consts["INTERACTIONS_PATH"],
         all_embeddings_path=consts["EMBEDDINGS_PATH"],
         train_parts=cfg.dataset.train_parts,
-        val_parts=cfg.dataset.val_parts,
-        test_parts=cfg.dataset.test_parts,
+        eval_parts=cfg.dataset.eval_parts,
         max_seq_len=cfg.model.max_seq_len,
     )
 
     train_dataset = SASRecTrainDataset(data.train_samples)
-    valid_dataset = SASRecEvalDataset(data.val_samples)
-    eval_dataset = SASRecEvalDataset(data.test_samples)
+    eval_dataset = SASRecEvalDataset(data.eval_samples)
 
     train_dataloader = DataLoader(
         dataset=train_dataset,
         batch_size=cfg.training.train_batch_size,
         shuffle=True,
         drop_last=True,
-        collate_fn=collate_fn(device),
-    )
-
-    valid_dataloader = DataLoader(
-        dataset=valid_dataset,
-        batch_size=cfg.training.valid_batch_size,
-        shuffle=False,
-        drop_last=False,
         collate_fn=collate_fn(device),
     )
 
@@ -145,13 +134,13 @@ def train_model(cfg: DictConfig):
             losses.append(outputs["loss"].item())
 
         train_metrics = {"train/loss": sum(losses) / len(losses)}
-        validation_metrics = run_evaluation(model, valid_dataloader, "validation/")
         eval_metrics = run_evaluation(model, eval_dataloader, "eval/")
-        all_metrics = {**train_metrics, **validation_metrics, **eval_metrics}
+        all_metrics = {**train_metrics, **eval_metrics}
         tensorboard_logger.add_metrics((epoch + 1) * (batch_idx + 1), all_metrics)
 
     tensorboard_logger.close()
 
+    Path(cfg.paths.checkpoints_dir).mkdir(parents=True, exist_ok=True)
     last_model_path = Path(cfg.paths.checkpoints_dir) / f"{consts['EXPERIMENT_NAME']}_last.pth"
     torch.save(model.state_dict(), last_model_path)
     logger.info(f"Last model saved to: {last_model_path}")

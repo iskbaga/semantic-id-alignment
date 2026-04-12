@@ -14,8 +14,7 @@ dataset:
 
 train:
   rqvae_train_parts: [0, 8]
-  rqvae_val_parts: [8, 9]
-  rqvae_test_parts: [9, 10]
+  rqvae_eval_parts: [9, 10]
 
 inference:
   allowed_items_parts: [0, 8]

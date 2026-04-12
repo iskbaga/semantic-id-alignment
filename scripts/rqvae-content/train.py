@@ -63,8 +63,7 @@ def run_inference(model, dataloader, save_path):
 def generate_constants(cfg: DictConfig):
     split_name = (
         f"{cfg.train.rqvae_train_parts[0]}-{cfg.train.rqvae_train_parts[1]}TR_"
-        f"{cfg.train.rqvae_val_parts[0]}-{cfg.train.rqvae_val_parts[1]}V_"
-        f"{cfg.train.rqvae_test_parts[0]}-{cfg.train.rqvae_test_parts[1]}T"
+        f"{cfg.train.rqvae_eval_parts[0]}-{cfg.train.rqvae_eval_parts[1]}TE"
     )
 
     results_path = Path(cfg.paths.results_dir) / split_name / "rqvae-content"
@@ -100,16 +99,10 @@ def train_rqvae(cfg: DictConfig):
         parts=cfg.train.rqvae_train_parts,
     )
 
-    val_dataset = EmbeddingsDataset(
+    eval_dataset = EmbeddingsDataset(
         all_interactions_path=consts["INTERACTIONS_PATH"],
         all_embeddings_path=consts["EMBEDDINGS_PATH"],
-        parts=cfg.train.rqvae_val_parts,
-    )
-
-    test_dataset = EmbeddingsDataset(
-        all_interactions_path=consts["INTERACTIONS_PATH"],
-        all_embeddings_path=consts["EMBEDDINGS_PATH"],
-        parts=cfg.train.rqvae_test_parts,
+        parts=cfg.train.rqvae_eval_parts,
     )
 
     train_dataloader = StatefulDataLoader(
@@ -128,16 +121,8 @@ def train_rqvae(cfg: DictConfig):
         collate_fn=collate_fn(device),
     )
 
-    val_dataloader = StatefulDataLoader(
-        val_dataset,
-        batch_size=cfg.training.batch_size,
-        shuffle=False,
-        drop_last=False,
-        collate_fn=collate_fn(device),
-    )
-
-    test_dataloader = StatefulDataLoader(
-        test_dataset,
+    eval_dataloader = StatefulDataLoader(
+        eval_dataset,
         batch_size=cfg.training.batch_size,
         shuffle=False,
         drop_last=False,
@@ -193,17 +178,13 @@ def train_rqvae(cfg: DictConfig):
         train_metrics = {key: sum(values) / len(values) for key, values in train_accumulators.items()}
         train_metrics["num_dead/max_collisitons_num"] = last_max_collisions
 
-        val_metrics = run_evaluation(
-            model, val_dataloader, "validation/", ["loss", "recon_loss", "rqvae_loss"]
-        )
-        test_metrics = run_evaluation(
-            model, test_dataloader, "eval/", ["loss", "recon_loss", "rqvae_loss"]
-        )
-        all_metrics = {**train_metrics, **val_metrics, **test_metrics}
+        eval_metrics = run_evaluation(model, eval_dataloader, "eval/", ["loss", "recon_loss", "rqvae_loss"])
+        all_metrics = {**train_metrics, **eval_metrics}
         tensorboard_logger.add_metrics((epoch + 1) * (batch_idx + 1), all_metrics)
 
     tensorboard_logger.close()
 
+    Path(cfg.paths.checkpoints_dir).mkdir(parents=True, exist_ok=True)
     last_model_path = Path(cfg.paths.checkpoints_dir) / f"{consts['EXPERIMENT_NAME']}_last.pth"
     torch.save(model.state_dict(), last_model_path)
     logger.info(f"Last model saved to: {last_model_path}")

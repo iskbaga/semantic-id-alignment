@@ -15,8 +15,7 @@ from modeling.datasets import EmbeddingsDataset
 def generate_constants(cfg: DictConfig):
     rqvae_split_name = (
         f"{cfg.train.rqvae_train_parts[0]}-{cfg.train.rqvae_train_parts[1]}TR_"
-        f"{cfg.train.rqvae_val_parts[0]}-{cfg.train.rqvae_val_parts[1]}V_"
-        f"{cfg.train.rqvae_test_parts[0]}-{cfg.train.rqvae_test_parts[1]}T"
+        f"{cfg.train.rqvae_eval_parts[0]}-{cfg.train.rqvae_eval_parts[1]}TE"
     )
 
     results_path = Path(cfg.paths.results_dir) / rqvae_split_name / "rqvae-collab"
