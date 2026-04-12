@@ -94,22 +94,50 @@ def train_rqvae(cfg: DictConfig):
     device = cfg.training.device if torch.cuda.is_available() and cfg.training.device != "cpu" else "cpu"
     logger.info(f"Using device: {device}")
 
-    dataset = EmbeddingsDataset(
+    train_dataset = EmbeddingsDataset(
         all_interactions_path=consts["INTERACTIONS_PATH"],
         all_embeddings_path=consts["EMBEDDINGS_PATH"],
-        train_parts=cfg.train.rqvae_train_parts,
+        parts=cfg.train.rqvae_train_parts,
+    )
+
+    val_dataset = EmbeddingsDataset(
+        all_interactions_path=consts["INTERACTIONS_PATH"],
+        all_embeddings_path=consts["EMBEDDINGS_PATH"],
+        parts=cfg.train.rqvae_val_parts,
+    )
+
+    test_dataset = EmbeddingsDataset(
+        all_interactions_path=consts["INTERACTIONS_PATH"],
+        all_embeddings_path=consts["EMBEDDINGS_PATH"],
+        parts=cfg.train.rqvae_test_parts,
     )
 
     train_dataloader = StatefulDataLoader(
-        dataset=dataset,
+        dataset=train_dataset,
         batch_size=cfg.training.batch_size,
         shuffle=True,
         drop_last=True,
         collate_fn=collate_fn(device),
     )
 
-    valid_dataloader = StatefulDataLoader(
-        dataset,
+    eval_train_dataloader = StatefulDataLoader(
+        train_dataset,
+        batch_size=cfg.training.batch_size,
+        shuffle=False,
+        drop_last=False,
+        collate_fn=collate_fn(device),
+    )
+
+    val_dataloader = StatefulDataLoader(
+        val_dataset,
+        batch_size=cfg.training.batch_size,
+        shuffle=False,
+        drop_last=False,
+        collate_fn=collate_fn(device),
+    )
+
+    test_dataloader = StatefulDataLoader(
+        test_dataset,
         batch_size=cfg.training.batch_size,
         shuffle=False,
         drop_last=False,
@@ -124,7 +152,7 @@ def train_rqvae(cfg: DictConfig):
         beta=cfg.model.beta,
     ).to(device)
 
-    codebook_initialize(model, valid_dataloader)
+    codebook_initialize(model, eval_train_dataloader)
 
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -152,7 +180,7 @@ def train_rqvae(cfg: DictConfig):
             loss.backward()
             optimizer.step()
 
-            num_fixed, max_collisions = fix_dead_codebooks(model, valid_dataloader)
+            num_fixed, max_collisions = fix_dead_codebooks(model, eval_train_dataloader)
             last_max_collisions = max_collisions
 
             train_accumulators["train/loss"].append(outputs["loss"])
@@ -165,10 +193,13 @@ def train_rqvae(cfg: DictConfig):
         train_metrics = {key: sum(values) / len(values) for key, values in train_accumulators.items()}
         train_metrics["num_dead/max_collisitons_num"] = last_max_collisions
 
-        validation_metrics = run_evaluation(
-            model, valid_dataloader, "validation/", ["loss", "recon_loss", "rqvae_loss"]
+        val_metrics = run_evaluation(
+            model, val_dataloader, "validation/", ["loss", "recon_loss", "rqvae_loss"]
         )
-        all_metrics = {**train_metrics, **validation_metrics}
+        test_metrics = run_evaluation(
+            model, test_dataloader, "eval/", ["loss", "recon_loss", "rqvae_loss"]
+        )
+        all_metrics = {**train_metrics, **val_metrics, **test_metrics}
         tensorboard_logger.add_metrics((epoch + 1) * (batch_idx + 1), all_metrics)
 
     tensorboard_logger.close()
@@ -217,7 +248,7 @@ def train_rqvae(cfg: DictConfig):
     with open(consts["ALL_MAPPING_PATH"], "w") as f:
         json.dump(all_mapping, f, indent=2)
 
-    train_interactions = dataset.get_interactions_by_part(
+    train_interactions = train_dataset.get_interactions_by_part(
         cfg.train.rqvae_train_parts[0], cfg.train.rqvae_train_parts[1]
     )
 

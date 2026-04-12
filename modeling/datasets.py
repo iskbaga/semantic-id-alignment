@@ -4,7 +4,7 @@ from loguru import logger
 
 
 class EmbeddingsDataset:
-    def __init__(self, all_interactions_path, all_embeddings_path, train_parts=None):
+    def __init__(self, all_interactions_path, all_embeddings_path, parts=None):
         self.all_interactions_path = all_interactions_path
         self.all_embeddings_path = all_embeddings_path
 
@@ -21,15 +21,15 @@ class EmbeddingsDataset:
         logger.info(f"Loaded {len(self.all_interactions)} interactions")
         logger.info(f"Loaded {len(all_embeddings)} embeddings")
 
-        if train_parts is not None:
-            train_interactions = self.get_interactions_by_part(train_parts[0], train_parts[1])
-            train_embeddings_dict = self._get_interactions_embeddings(train_interactions, all_embeddings)
+        if parts is not None:
+            interactions = self.get_interactions_by_part(parts[0], parts[1])
+            embeddings_dict = self._get_interactions_embeddings(interactions, all_embeddings)
         else:
-            logger.info("TRAIN PARTS IS NONE (it is ok if it infer)")
-            train_embeddings_dict = self._get_interactions_embeddings(self.all_interactions, all_embeddings)
+            logger.info("PARTS IS NONE (loading all items)")
+            embeddings_dict = self._get_interactions_embeddings(self.all_interactions, all_embeddings)
 
-        self.item_ids = list(train_embeddings_dict.keys())
-        self.embeddings = list(train_embeddings_dict.values())
+        self.item_ids = list(embeddings_dict.keys())
+        self.embeddings = list(embeddings_dict.values())
 
     def __getitem__(self, idx):
         tensor_emb = self.embeddings[idx]
