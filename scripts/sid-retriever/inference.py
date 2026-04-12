@@ -110,7 +110,7 @@ def generate_constants(cfg: DictConfig):
         "EMBEDDINGS_PATH": Path(cfg.paths.data_dir) / "items_metadata_remapped.parquet",
         "ALL_ITEMS_SEMANTIC_MAPPING_PATH": rqvae_results_path / all_items_mapping_path_name,
         "TRAIN_PART_SEMANTIC_MAPPING_PATH": rqvae_results_path / train_part_mapping_path_name,
-        "PRETRAINED_MODEL_MASK": f"{experiment_name}_best_*.pth",
+        "PRETRAINED_MODEL_MASK": f"{experiment_name}_*.pth",
     }
 
 
@@ -124,7 +124,7 @@ def tiger_inference(cfg: DictConfig):
     logger.info(f"Using device: {device}")
 
     model_files = list(Path(cfg.paths.checkpoints_dir).glob(consts["PRETRAINED_MODEL_MASK"]))
-    assert len(model_files) == 1, f"Expected exactly one model file, found {len(model_files)}"
+    assert len(model_files) >= 1, f"Expected at least one model file, found {len(model_files)}"
     pretrained_model_path = max(model_files, key=lambda p: p.stat().st_mtime)
     logger.info(f"Loading pre-trained model from: {pretrained_model_path}")
     logger.info(f"Eval parts interval: [{cfg.inference.eval_parts[0]}, {cfg.inference.eval_parts[1]})")

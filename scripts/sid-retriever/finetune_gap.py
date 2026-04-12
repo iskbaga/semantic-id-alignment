@@ -97,7 +97,7 @@ def generate_constants(cfg: DictConfig):
             f"{cfg.finetune.matching_method}_to_{pretrained_rqvae_split_name}_{train_part_mapping_path_name}"
         )
 
-    pretrained_model_mask = f"{pretrained_name}_best_*.pth"
+    pretrained_model_mask = f"{pretrained_name}_*.pth"
 
     return {
         "EXPERIMENT_NAME": experiment_name,
@@ -119,7 +119,7 @@ def train_tiger_finetune(cfg: DictConfig):
     logger.info(f"Using device: {device}")
 
     model_files = list(Path(cfg.paths.checkpoints_dir).glob(consts["PRETRAINED_MODEL_MASK"]))
-    assert len(model_files) == 1, f"Expected exactly one model file, found {len(model_files)}"
+    assert len(model_files) >= 1, f"Expected at least one model file, found {len(model_files)}"
     pretrained_model_path = max(model_files, key=lambda p: p.stat().st_mtime)
     logger.info(f"Loading pre-trained model from: {pretrained_model_path}")
     logger.info(f"Semantic IDs train mapping path: {consts['TRAIN_PART_SEMANTIC_MAPPING_PATH']}")
@@ -246,7 +246,8 @@ def train_tiger_finetune(cfg: DictConfig):
     tensorboard_logger.close()
 
     Path(cfg.paths.checkpoints_dir).mkdir(parents=True, exist_ok=True)
-    last_model_path = Path(cfg.paths.checkpoints_dir) / f"{consts['EXPERIMENT_NAME']}_last.pth"
+    timestamp = tensorboard_logger.get_timestamp()
+    last_model_path = Path(cfg.paths.checkpoints_dir) / f"{consts['EXPERIMENT_NAME']}_{timestamp}.pth"
     torch.save(model.state_dict(), last_model_path)
     logger.info(f"Last model saved to: {last_model_path}")
     logger.info("Fine-tuning completed successfully!")

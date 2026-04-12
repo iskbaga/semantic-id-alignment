@@ -46,7 +46,7 @@ def generate_constants(cfg: DictConfig):
     embeddings_path = Path(cfg.paths.data_dir) / "items_metadata_remapped.parquet"
 
     experiment_name = f"{old_experiment_name}_finetuned_on_{cfg.finetune.gap_parts[0]}-{cfg.finetune.gap_parts[1]}"
-    previous_model_mask = f"{old_experiment_name}_best_*.pth"
+    previous_model_mask = f"{old_experiment_name}_*.pth"
 
     return {
         "SPLIT_NAME": split_name,
@@ -120,7 +120,7 @@ def finetune_sasrec(cfg: DictConfig):
     ).to(device)
 
     model_files = list(Path(cfg.paths.checkpoints_dir).glob(consts["PREVIOUS_MODEL_MASK"]))
-    assert len(model_files) == 1, f"Expected exactly one model file, found {len(model_files)}"
+    assert len(model_files) >= 1, f"Expected at least one model file, found {len(model_files)}"
     finetune_model_path = max(model_files, key=lambda p: p.stat().st_mtime)
     logger.info(f"MODEL TO FINETUNE: {finetune_model_path}")
     state_dict = torch.load(finetune_model_path)
@@ -170,7 +170,8 @@ def finetune_sasrec(cfg: DictConfig):
     tensorboard_logger.close()
 
     Path(cfg.paths.checkpoints_dir).mkdir(parents=True, exist_ok=True)
-    last_model_path = Path(cfg.paths.checkpoints_dir) / f"{consts['EXPERIMENT_NAME']}_last.pth"
+    timestamp = tensorboard_logger.get_timestamp()
+    last_model_path = Path(cfg.paths.checkpoints_dir) / f"{consts['EXPERIMENT_NAME']}_{timestamp}.pth"
     torch.save(model.state_dict(), last_model_path)
     logger.info(f"Last model saved to: {last_model_path}")
     logger.info("Finetuning completed successfully!")

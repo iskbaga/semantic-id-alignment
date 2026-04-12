@@ -185,7 +185,8 @@ def train_rqvae(cfg: DictConfig):
     tensorboard_logger.close()
 
     Path(cfg.paths.checkpoints_dir).mkdir(parents=True, exist_ok=True)
-    last_model_path = Path(cfg.paths.checkpoints_dir) / f"{consts['EXPERIMENT_NAME']}_last.pth"
+    timestamp = tensorboard_logger.get_timestamp()
+    last_model_path = Path(cfg.paths.checkpoints_dir) / f"{consts['EXPERIMENT_NAME']}_{timestamp}.pth"
     torch.save(model.state_dict(), last_model_path)
     logger.info(f"Last model saved to: {last_model_path}")
 
