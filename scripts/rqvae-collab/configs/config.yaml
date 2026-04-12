@@ -32,7 +32,4 @@ training:
   device: "cuda:0"
   num_epochs: 100
   batch_size: 4096
-  metric: "validation/loss"
-  patience: 40
-  minimize_metric: true
   lr: 1e-4

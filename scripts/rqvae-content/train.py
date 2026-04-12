@@ -16,7 +16,7 @@ from torchdata.stateful_dataloader import StatefulDataLoader
 sys.path.append("..")
 
 from modeling.datasets import EmbeddingsDataset
-from modeling.training import EarlyStopper, TensorboardLogger
+from modeling.training import TensorboardLogger
 from modeling.utils import fix_random_seed, run_evaluation
 
 
@@ -136,14 +136,6 @@ def train_rqvae(cfg: DictConfig):
 
     tensorboard_logger = TensorboardLogger(experiment_name=consts["EXPERIMENT_NAME"], logdir=cfg.paths.tensorboard_dir)
 
-    early_stopper = EarlyStopper(
-        metric=cfg.training.metric,
-        patience=cfg.training.patience,
-        minimize=cfg.training.minimize_metric,
-        checkpoints_dir=cfg.paths.checkpoints_dir,
-        experiment_name=consts["EXPERIMENT_NAME"],
-    )
-
     logger.debug("Everything is ready for training process!")
 
     last_max_collisions = 0
@@ -179,18 +171,11 @@ def train_rqvae(cfg: DictConfig):
         all_metrics = {**train_metrics, **validation_metrics}
         tensorboard_logger.add_metrics((epoch + 1) * (batch_idx + 1), all_metrics)
 
-        if early_stopper.check(all_metrics[cfg.training.metric], model):
-            logger.info("Early stopping triggered")
-            break
-
     tensorboard_logger.close()
 
-    best_model_file = early_stopper.get_best_model_path()
-    assert best_model_file is not None
-
-    logger.info(f"Loading best model from: {best_model_file}")
-    state_dict = torch.load(best_model_file)
-    model.load_state_dict(state_dict)
+    last_model_path = Path(cfg.paths.checkpoints_dir) / f"{consts['EXPERIMENT_NAME']}_last.pth"
+    torch.save(model.state_dict(), last_model_path)
+    logger.info(f"Last model saved to: {last_model_path}")
 
     inference_dataset = EmbeddingsDataset(
         all_interactions_path=consts["INTERACTIONS_PATH"], all_embeddings_path=consts["EMBEDDINGS_PATH"]

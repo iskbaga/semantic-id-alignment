@@ -15,7 +15,7 @@ from data import TigerEvalDataset, TigerTrainDataset, create_semantic_mapping_ar
 sys.path.append("..")
 
 from modeling.datasets import FinetuneDataset
-from modeling.training import EarlyStopper, TensorboardLogger
+from modeling.training import TensorboardLogger
 from modeling.utils import collate, fix_random_seed, run_evaluation
 
 
@@ -217,14 +217,6 @@ def train_tiger_finetune(cfg: DictConfig):
 
     tensorboard_logger = TensorboardLogger(experiment_name=consts["EXPERIMENT_NAME"], logdir=cfg.paths.tensorboard_dir)
 
-    early_stopper = EarlyStopper(
-        metric=cfg.training.metric,
-        patience=cfg.training.patience,
-        minimize=cfg.training.minimize_metric,
-        checkpoints_dir=cfg.paths.checkpoints_dir,
-        experiment_name=consts["EXPERIMENT_NAME"],
-    )
-
     logger.debug("Everything is ready for fine-tuning process!")
 
     for epoch in range(cfg.training.num_epochs):
@@ -253,17 +245,14 @@ def train_tiger_finetune(cfg: DictConfig):
             all_metrics.update(eval_metrics)
 
             tensorboard_logger.add_metrics((epoch + 1) * (batch_idx + 1), all_metrics)
-
-            if early_stopper.check(all_metrics[cfg.training.metric], model):
-                logger.info("Early stopping triggered")
-                break
         else:
             tensorboard_logger.add_metrics((epoch + 1) * (batch_idx + 1), all_metrics)
 
     tensorboard_logger.close()
 
-    best_model_file = early_stopper.get_best_model_path()
-    logger.info(f"Best model path is: {best_model_file}")
+    last_model_path = Path(cfg.paths.checkpoints_dir) / f"{consts['EXPERIMENT_NAME']}_last.pth"
+    torch.save(model.state_dict(), last_model_path)
+    logger.info(f"Last model saved to: {last_model_path}")
     logger.info("Fine-tuning completed successfully!")
 
 

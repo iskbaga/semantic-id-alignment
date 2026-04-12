@@ -55,9 +55,6 @@ training:
   valid_batch_size: 256
   num_epochs: 30
   lr: 1e-4
-  patience: 40
-  minimize_metric: false
-  metric: "validation/ndcg@20"
 
 inference:
   use_finetune_model: True

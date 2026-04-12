@@ -37,8 +37,5 @@ training:
   num_epochs: 150
   train_batch_size: 256
   valid_batch_size: 1024
-  metric: "validation/ndcg@20"
-  patience: 60
-  minimize_metric: false
   lr: 1e-4
   save_embeddings: true
