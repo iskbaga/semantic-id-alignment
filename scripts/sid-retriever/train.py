@@ -55,7 +55,7 @@ def generate_constants(cfg: DictConfig):
         f"{cfg.train.rqvae_eval_parts[0]}-{cfg.train.rqvae_eval_parts[1]}TE"
     )
 
-    experiment_name = f"sid-retriever_{cfg.dataset.name}_{sid_retriever_split_name}_{rqvae_split_name}"
+    experiment_name = f"sid-retriever-{cfg.dataset.rqvae.model_name}_{cfg.dataset.name}_{sid_retriever_split_name}_{rqvae_split_name}"
 
     results_path = Path(cfg.paths.results_dir) / rqvae_split_name / f"rqvae-{cfg.dataset.rqvae.model_name}"
 

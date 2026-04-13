@@ -45,7 +45,7 @@ def generate_constants(cfg: DictConfig):
     interactions_path = Path(cfg.paths.data_dir) / "all_data_interactions_with_groups.parquet"
     embeddings_path = Path(cfg.paths.data_dir) / "items_metadata_remapped.parquet"
 
-    experiment_name = f"{old_experiment_name}_finetuned_on_{cfg.finetune.gap_parts[0]}-{cfg.finetune.gap_parts[1]}"
+    experiment_name = f"finetuned_{old_experiment_name}_on_{cfg.finetune.gap_parts[0]}-{cfg.finetune.gap_parts[1]}"
     previous_model_mask = f"{old_experiment_name}_*.pth"
 
     return {

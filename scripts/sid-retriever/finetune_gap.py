@@ -55,7 +55,7 @@ def generate_constants(cfg: DictConfig):
     )
 
     pretrained_name = (
-        f"sid-retriever_{cfg.dataset.name}_{pretrained_sid_retriever_split_name}_{pretrained_rqvae_split_name}"
+        f"sid-retriever-{cfg.dataset.rqvae.model_name}_{cfg.dataset.name}_{pretrained_sid_retriever_split_name}_{pretrained_rqvae_split_name}"
     )
 
     finetune_allowed_parts = (
@@ -73,7 +73,7 @@ def generate_constants(cfg: DictConfig):
 
     assert cfg.finetune.matching_method in ["greedy", "hungarian", "none"]
     experiment_name = (
-        f"{pretrained_name}_finetuned_"
+        f"finetuned_{pretrained_name}_on_"
         f"{cfg.finetune.sid_retriever_gap_parts[0]}-{cfg.finetune.sid_retriever_gap_parts[1]}G_"
         f"{cfg.finetune.matching_method}_"
         f"{finetune_sid_retriever_split_name}_"
