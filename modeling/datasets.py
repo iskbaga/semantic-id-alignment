@@ -204,9 +204,9 @@ class FinetuneDataset(SequentialDataset):
         self,
         all_interactions_path,
         all_embeddings_path,
-        train_parts=(0, 17),
-        gap_parts=(17, 18),
-        eval_parts=(19, 20),
+        train_parts=(0, 8),
+        gap_parts=(8, 9),
+        eval_parts=(9, 10),
         max_seq_len=20,
     ):
         self.gap_parts = gap_parts

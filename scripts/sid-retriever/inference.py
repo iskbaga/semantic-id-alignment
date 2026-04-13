@@ -52,7 +52,9 @@ def generate_constants(cfg: DictConfig):
     )
 
     pretrained_name = (
-        f"sid-retriever-{cfg.dataset.rqvae.model_name}_{cfg.dataset.name}_{pretrained_sid_retriever_split_name}_{pretrained_rqvae_split_name}"
+        f"sid-retriever-{cfg.dataset.rqvae.model_name}_"
+        f"{cfg.dataset.name}_{pretrained_sid_retriever_split_name}_"
+        f"{pretrained_rqvae_split_name}"
     )
 
     if cfg.inference.use_finetune_model:

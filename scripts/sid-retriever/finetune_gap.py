@@ -55,7 +55,9 @@ def generate_constants(cfg: DictConfig):
     )
 
     pretrained_name = (
-        f"sid-retriever-{cfg.dataset.rqvae.model_name}_{cfg.dataset.name}_{pretrained_sid_retriever_split_name}_{pretrained_rqvae_split_name}"
+        f"sid-retriever-{cfg.dataset.rqvae.model_name}_"
+        f"{cfg.dataset.name}_{pretrained_sid_retriever_split_name}_"
+        f"{pretrained_rqvae_split_name}"
     )
 
     finetune_allowed_parts = (
@@ -246,8 +248,9 @@ def train_tiger_finetune(cfg: DictConfig):
     tensorboard_logger.close()
 
     Path(cfg.paths.checkpoints_dir).mkdir(parents=True, exist_ok=True)
-    timestamp = tensorboard_logger.get_timestamp()
-    last_model_path = Path(cfg.paths.checkpoints_dir) / f"{consts['EXPERIMENT_NAME']}_{timestamp}.pth"
+    last_model_path = (
+        Path(cfg.paths.checkpoints_dir) / f"{consts['EXPERIMENT_NAME']}_{tensorboard_logger.timestamp}.pth"
+    )
     torch.save(model.state_dict(), last_model_path)
     logger.info(f"Last model saved to: {last_model_path}")
     logger.info("Fine-tuning completed successfully!")

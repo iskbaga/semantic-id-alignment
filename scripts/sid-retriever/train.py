@@ -55,7 +55,11 @@ def generate_constants(cfg: DictConfig):
         f"{cfg.train.rqvae_eval_parts[0]}-{cfg.train.rqvae_eval_parts[1]}TE"
     )
 
-    experiment_name = f"sid-retriever-{cfg.dataset.rqvae.model_name}_{cfg.dataset.name}_{sid_retriever_split_name}_{rqvae_split_name}"
+    experiment_name = (
+        f"sid-retriever-{cfg.dataset.rqvae.model_name}_"
+        f"{cfg.dataset.name}_{sid_retriever_split_name}_"
+        f"{rqvae_split_name}"
+    )
 
     results_path = Path(cfg.paths.results_dir) / rqvae_split_name / f"rqvae-{cfg.dataset.rqvae.model_name}"
 
@@ -181,8 +185,9 @@ def train_model(cfg: DictConfig):
     tensorboard_logger.close()
 
     Path(cfg.paths.checkpoints_dir).mkdir(parents=True, exist_ok=True)
-    timestamp = tensorboard_logger.get_timestamp()
-    last_model_path = Path(cfg.paths.checkpoints_dir) / f"{consts['EXPERIMENT_NAME']}_{timestamp}.pth"
+    last_model_path = (
+        Path(cfg.paths.checkpoints_dir) / f"{consts['EXPERIMENT_NAME']}_{tensorboard_logger.timestamp}.pth"
+    )
     torch.save(model.state_dict(), last_model_path)
     logger.info(f"Last model saved to: {last_model_path}")
     logger.info("Training completed successfully!")
