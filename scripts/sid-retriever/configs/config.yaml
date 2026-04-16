@@ -16,23 +16,19 @@ dataset:
 
 train:
   sid_retriever_train_parts: [0, 8]
-  sid_retriever_val_parts: [8, 9]
-  sid_retriever_test_parts: [9, 10]
+  sid_retriever_eval_parts: [9, 10]
   allowed_items_parts: [0, 8]
   rqvae_train_parts: [0, 8]
-  rqvae_val_parts: [8, 9]
-  rqvae_test_parts: [9, 10]
+  rqvae_eval_parts: [9, 10]
 
 finetune:
   matching_method: "hungarian"  # none, hungarian or greedy
   sid_retriever_train_parts: [0, 8]
   sid_retriever_gap_parts: [8, 9]
-  sid_retriever_val_parts: [8, 9]
-  sid_retriever_test_parts: [9, 10]
+  sid_retriever_eval_parts: [9, 10]
   allowed_items_parts: [0, 8]
   rqvae_train_parts: [0, 8]
-  rqvae_val_parts: [8, 9]
-  rqvae_test_parts: [9, 10]
+  rqvae_eval_parts: [9, 10]
 
 model:
   max_seq_len: 20
@@ -55,10 +51,7 @@ training:
   valid_batch_size: 256
   num_epochs: 30
   lr: 1e-4
-  patience: 40
-  minimize_metric: false
-  metric: "eval/ndcg@20"
 
 inference:
   use_finetune_model: True
-  test_parts: [9, 10]
+  eval_parts: [9, 10]

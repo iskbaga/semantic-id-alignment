@@ -16,7 +16,7 @@ from torchdata.stateful_dataloader import StatefulDataLoader
 sys.path.append("..")
 
 from modeling.datasets import EmbeddingsDataset
-from modeling.training import EarlyStopper, TensorboardLogger
+from modeling.training import TensorboardLogger
 from modeling.utils import fix_random_seed, run_evaluation
 
 
@@ -63,8 +63,7 @@ def run_inference(model, dataloader, save_path):
 def generate_constants(cfg: DictConfig):
     split_name = (
         f"{cfg.train.rqvae_train_parts[0]}-{cfg.train.rqvae_train_parts[1]}TR_"
-        f"{cfg.train.rqvae_val_parts[0]}-{cfg.train.rqvae_val_parts[1]}V_"
-        f"{cfg.train.rqvae_test_parts[0]}-{cfg.train.rqvae_test_parts[1]}T"
+        f"{cfg.train.rqvae_eval_parts[0]}-{cfg.train.rqvae_eval_parts[1]}TE"
     )
 
     results_path = Path(cfg.paths.results_dir) / split_name / "rqvae-collab"
@@ -97,22 +96,36 @@ def train_rqvae(cfg: DictConfig):
     device = cfg.training.device if torch.cuda.is_available() and cfg.training.device != "cpu" else "cpu"
     logger.info(f"Using device: {device}")
 
-    dataset = EmbeddingsDataset(
+    train_dataset = EmbeddingsDataset(
         all_interactions_path=consts["INTERACTIONS_PATH"],
         all_embeddings_path=consts["EMBEDDINGS_PATH"],
-        train_parts=cfg.train.rqvae_train_parts,
+        parts=cfg.train.rqvae_train_parts,
+    )
+
+    eval_dataset = EmbeddingsDataset(
+        all_interactions_path=consts["INTERACTIONS_PATH"],
+        all_embeddings_path=consts["EMBEDDINGS_PATH"],
+        parts=cfg.train.rqvae_eval_parts,
     )
 
     train_dataloader = StatefulDataLoader(
-        dataset=dataset,
+        dataset=train_dataset,
         batch_size=cfg.training.batch_size,
         shuffle=True,
         drop_last=True,
         collate_fn=collate_fn(device),
     )
 
-    valid_dataloader = StatefulDataLoader(
-        dataset,
+    eval_train_dataloader = StatefulDataLoader(
+        train_dataset,
+        batch_size=cfg.training.batch_size,
+        shuffle=False,
+        drop_last=False,
+        collate_fn=collate_fn(device),
+    )
+
+    eval_dataloader = StatefulDataLoader(
+        eval_dataset,
         batch_size=cfg.training.batch_size,
         shuffle=False,
         drop_last=False,
@@ -131,7 +144,7 @@ def train_rqvae(cfg: DictConfig):
         cf_embeddings=cf_embeddings,
     ).to(device)
 
-    codebook_initialize(model, valid_dataloader)
+    codebook_initialize(model, eval_train_dataloader)
 
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -142,14 +155,6 @@ def train_rqvae(cfg: DictConfig):
     optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.training.lr)
 
     tensorboard_logger = TensorboardLogger(experiment_name=consts["EXPERIMENT_NAME"], logdir=cfg.paths.tensorboard_dir)
-
-    early_stopper = EarlyStopper(
-        metric=cfg.training.metric,
-        patience=cfg.training.patience,
-        minimize=cfg.training.minimize_metric,
-        checkpoints_dir=cfg.paths.checkpoints_dir,
-        experiment_name=consts["EXPERIMENT_NAME"],
-    )
 
     logger.debug("Everything is ready for training process!")
 
@@ -167,7 +172,7 @@ def train_rqvae(cfg: DictConfig):
             loss.backward()
             optimizer.step()
 
-            num_fixed, max_collisions = fix_dead_codebooks(model, valid_dataloader)
+            num_fixed, max_collisions = fix_dead_codebooks(model, eval_train_dataloader)
             last_max_collisions = max_collisions
 
             train_accumulators["train/loss"].append(outputs["loss"])
@@ -180,24 +185,18 @@ def train_rqvae(cfg: DictConfig):
         train_metrics = {key: sum(values) / len(values) for key, values in train_accumulators.items()}
         train_metrics["num_dead/max_collisitons_num"] = last_max_collisions
 
-        validation_metrics = run_evaluation(
-            model, valid_dataloader, "validation/", ["loss", "recon_loss", "rqvae_loss"]
-        )
-        all_metrics = {**train_metrics, **validation_metrics}
+        eval_metrics = run_evaluation(model, eval_dataloader, "eval/", ["loss", "recon_loss", "rqvae_loss"])
+        all_metrics = {**train_metrics, **eval_metrics}
         tensorboard_logger.add_metrics((epoch + 1) * (batch_idx + 1), all_metrics)
-
-        if early_stopper.check(all_metrics[cfg.training.metric], model):
-            logger.info("Early stopping triggered")
-            break
 
     tensorboard_logger.close()
 
-    best_model_file = early_stopper.get_best_model_path()
-    assert best_model_file is not None
-
-    logger.info(f"Loading best model from: {best_model_file}")
-    state_dict = torch.load(best_model_file)
-    model.load_state_dict(state_dict)
+    Path(cfg.paths.checkpoints_dir).mkdir(parents=True, exist_ok=True)
+    last_model_path = (
+        Path(cfg.paths.checkpoints_dir) / f"{consts['EXPERIMENT_NAME']}_{tensorboard_logger.timestamp}.pth"
+    )
+    torch.save(model.state_dict(), last_model_path)
+    logger.info(f"Last model saved to: {last_model_path}")
 
     inference_dataset = EmbeddingsDataset(
         all_interactions_path=consts["INTERACTIONS_PATH"], all_embeddings_path=consts["EMBEDDINGS_PATH"]
@@ -239,7 +238,7 @@ def train_rqvae(cfg: DictConfig):
     with open(consts["ALL_MAPPING_PATH"], "w") as f:
         json.dump(all_mapping, f, indent=2)
 
-    train_interactions = dataset.get_interactions_by_part(
+    train_interactions = train_dataset.get_interactions_by_part(
         cfg.train.rqvae_train_parts[0], cfg.train.rqvae_train_parts[1]
     )
 

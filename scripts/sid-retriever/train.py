@@ -15,7 +15,7 @@ from data import TigerEvalDataset, TigerTrainDataset, create_semantic_mapping_ar
 sys.path.append("..")
 
 from modeling.datasets import SequentialDataset
-from modeling.training import EarlyStopper, TensorboardLogger
+from modeling.training import TensorboardLogger
 from modeling.utils import collate, fix_random_seed, run_evaluation
 
 
@@ -46,18 +46,20 @@ def generate_constants(cfg: DictConfig):
     allowed_parts = cfg.train.allowed_items_parts or cfg.train.sid_retriever_train_parts
     sid_retriever_split_name = (
         f"{cfg.train.sid_retriever_train_parts[0]}-{cfg.train.sid_retriever_train_parts[1]}TR_"
-        f"{cfg.train.sid_retriever_val_parts[0]}-{cfg.train.sid_retriever_val_parts[1]}V_"
-        f"{cfg.train.sid_retriever_test_parts[0]}-{cfg.train.sid_retriever_test_parts[1]}T_"
+        f"{cfg.train.sid_retriever_eval_parts[0]}-{cfg.train.sid_retriever_eval_parts[1]}TE_"
         f"items-{allowed_parts[0]}-{allowed_parts[1]}"
     )
 
     rqvae_split_name = (
         f"{cfg.train.rqvae_train_parts[0]}-{cfg.train.rqvae_train_parts[1]}TR_"
-        f"{cfg.train.rqvae_val_parts[0]}-{cfg.train.rqvae_val_parts[1]}V_"
-        f"{cfg.train.rqvae_test_parts[0]}-{cfg.train.rqvae_test_parts[1]}T"
+        f"{cfg.train.rqvae_eval_parts[0]}-{cfg.train.rqvae_eval_parts[1]}TE"
     )
 
-    experiment_name = f"sid-retriever_{cfg.dataset.name}_{sid_retriever_split_name}_{rqvae_split_name}"
+    experiment_name = (
+        f"sid-retriever-{cfg.dataset.rqvae.model_name}_"
+        f"{cfg.dataset.name}_{sid_retriever_split_name}_"
+        f"{rqvae_split_name}"
+    )
 
     results_path = Path(cfg.paths.results_dir) / rqvae_split_name / f"rqvae-{cfg.dataset.rqvae.model_name}"
 
@@ -91,8 +93,7 @@ def train_model(cfg: DictConfig):
         all_interactions_path=consts["INTERACTIONS_PATH"],
         all_embeddings_path=consts["EMBEDDINGS_PATH"],
         train_parts=cfg.train.sid_retriever_train_parts,
-        val_parts=cfg.train.sid_retriever_val_parts,
-        test_parts=cfg.train.sid_retriever_test_parts,
+        eval_parts=cfg.train.sid_retriever_eval_parts,
         max_seq_len=cfg.model.max_seq_len,
     )
 
@@ -101,7 +102,7 @@ def train_model(cfg: DictConfig):
     )
 
     eval_dataset = TigerEvalDataset(
-        data.test_samples, all_semantics_mapping_array, cfg.model.num_codebooks, cfg.model.num_user_hash
+        data.eval_samples, all_semantics_mapping_array, cfg.model.num_codebooks, cfg.model.num_user_hash
     )
 
     train_dataloader = DataLoader(
@@ -153,14 +154,6 @@ def train_model(cfg: DictConfig):
 
     tensorboard_logger = TensorboardLogger(experiment_name=consts["EXPERIMENT_NAME"], logdir=cfg.paths.tensorboard_dir)
 
-    early_stopper = EarlyStopper(
-        metric=cfg.training.metric,
-        patience=cfg.training.patience,
-        minimize=cfg.training.minimize_metric,
-        checkpoints_dir=cfg.paths.checkpoints_dir,
-        experiment_name=consts["EXPERIMENT_NAME"],
-    )
-
     logger.debug("Everything is ready for training process!")
 
     for epoch in range(cfg.training.num_epochs):
@@ -177,26 +170,26 @@ def train_model(cfg: DictConfig):
 
             losses.append(outputs["loss"].item())
 
-        all_metrics = {"train/loss": sum(losses) / len(losses)}
+        train_metrics = {"train/loss": sum(losses) / len(losses)}
+        all_metrics = train_metrics.copy()
 
-        if (epoch + 1) % 2 == 0:
-            logger.info("Doing evaluation")
-
+        if (epoch + 1) % 4 == 0:
+            logger.info("Doing test evaluation")
             eval_metrics = run_evaluation(model, eval_dataloader, "eval/")
             all_metrics.update(eval_metrics)
 
             tensorboard_logger.add_metrics((epoch + 1) * (batch_idx + 1), all_metrics)
-
-            if early_stopper.check(all_metrics[cfg.training.metric], model):
-                logger.info("Early stopping triggered")
-                break
         else:
             tensorboard_logger.add_metrics((epoch + 1) * (batch_idx + 1), all_metrics)
 
     tensorboard_logger.close()
 
-    best_model_file = early_stopper.get_best_model_path()
-    logger.info(f"Best model path is: {best_model_file}")
+    Path(cfg.paths.checkpoints_dir).mkdir(parents=True, exist_ok=True)
+    last_model_path = (
+        Path(cfg.paths.checkpoints_dir) / f"{consts['EXPERIMENT_NAME']}_{tensorboard_logger.timestamp}.pth"
+    )
+    torch.save(model.state_dict(), last_model_path)
+    logger.info(f"Last model saved to: {last_model_path}")
     logger.info("Training completed successfully!")
 
 

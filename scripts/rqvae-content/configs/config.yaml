@@ -14,8 +14,7 @@ dataset:
 
 train:
   rqvae_train_parts: [0, 8]
-  rqvae_val_parts: [8, 9]
-  rqvae_test_parts: [9, 10]
+  rqvae_eval_parts: [9, 10]
 
 inference:
   allowed_items_parts: [0, 8]
@@ -32,7 +31,4 @@ training:
   device: "cuda:0"
   num_epochs: 100
   batch_size: 4096
-  metric: "validation/loss"
-  patience: 40
-  minimize_metric: true
   lr: 1e-4
